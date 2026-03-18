@@ -8,9 +8,9 @@
 
 ## 项目状态
 
-**当前阶段：** 架构设计 & 技术选型  
+**当前阶段：** Milestone A（架构闭环）  
 **最近更新：** 2026-03-18  
-**下一个目标：** 完成 Milestone A（架构闭环）
+**下一个目标：** 完成悬浮球 UI + WebSocket 通路（Milestone A.1 / A.2）
 
 ---
 
@@ -23,7 +23,7 @@
 | 后端（进程内嵌） | Node.js + Fastify |
 | AI 调用 | OpenAI 兼容接口（流式） |
 | 本地存储 | SQLite + JSON 文件（按天） |
-| 包管理 | monorepo（npm workspaces） |
+| 包管理 | monorepo（pnpm workspaces） |
 
 ---
 
@@ -31,7 +31,7 @@
 
 | 里程碑 | 内容 | 状态 |
 |--------|------|------|
-| Milestone 0 | 架构设计与技术选型 | ✅ 完成 |
+| Milestone 0 | 架构设计、技术选型、脚手架搭建 | ✅ 完成 |
 | Milestone A | 架构闭环（Gateway + Agent Loop + 三工具） | 🔲 未开始 |
 | Milestone B | 体验稳定（取消/超时/记忆归档） | 🔲 未开始 |
 | Milestone C | 可扩展（测试基线 + 扩展位预留） | 🔲 未开始 |
@@ -39,6 +39,29 @@
 ---
 
 ## 开发日志
+
+### 2026-03-18｜Milestone 0 · 脚手架搭建完成
+
+**完成内容：**
+- 初始化 pnpm monorepo，创建完整目录骨架（`apps/desktop` + `packages/backend` + `packages/shared`）
+- 配置 TypeScript 多包体系：根 `tsconfig.base.json` + 各包独立 tsconfig，typecheck 全部 0 报错
+- 跑通 Electron 主进程 + React 渲染进程（Hello World 窗口可正常显示）
+- 跑通 IPC 双向通路：renderer 点击 → `contextBridge.ping()` → `ipcMain.handle` → 回传显示
+- 嵌入 Fastify 后端 Service：`startBackend()` 随 Electron 主进程启动，`GET /health` 验证通过
+
+**验证结果：**
+- `pnpm dev` 启动 Electron 窗口 ✅
+- IPC 通路：renderer → main → renderer 回传 ✅  
+- `curl http://127.0.0.1:3721/health` → `{"status":"ok"}` ✅
+
+**关键决策记录：**
+- 构建工具选用 `electron-vite`（而非手动配置 webpack），大幅简化 main/preload/renderer 三端构建配置
+- 后端包通过 pnpm `workspace:*` 协议引用，TypeScript project references 保证跨包类型安全
+- Fastify 监听 `127.0.0.1`（非 `0.0.0.0`），仅本机可访问，符合安全基线
+
+**下一步：** Milestone A.1 — 悬浮球 UI（frameless + always-on-top 双窗口架构）
+
+---
 
 ### 2026-03-18｜Milestone 0 · 架构设计完成
 
