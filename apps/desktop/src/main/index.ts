@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 
 function createWindow(): void {
@@ -21,6 +21,12 @@ function createWindow(): void {
     win.loadFile(join(__dirname, '../renderer/index.html'))
   }
 }
+
+// IPC 通路验证：renderer → main → renderer
+ipcMain.handle('ipc:ping', () => {
+  console.log('[main] IPC OK — received ping from renderer')
+  return 'pong from main 🐾'
+})
 
 app.whenReady().then(() => {
   createWindow()
