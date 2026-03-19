@@ -1,0 +1,181 @@
+/* ── ChatPanel 面板样式 ───────────────────────────────── */
+
+.chat-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100vh;
+  background: rgba(24, 24, 28, 0.95);
+  border-radius: 12px;
+  overflow: hidden;
+  color: #f0f0f0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* ── 头部 ────────────────────────────────────────────── */
+
+.chat-panel__header {
+  display: flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 16px;
+  background: rgba(30, 30, 34, 0.9);
+  -webkit-app-region: drag;
+  flex-shrink: 0;
+}
+
+.chat-panel__title {
+  font-size: 14px;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+/* ── 消息列表 ────────────────────────────────────────── */
+
+.chat-panel__messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chat-panel__messages::-webkit-scrollbar {
+  width: 4px;
+}
+
+.chat-panel__messages::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
+}
+
+.chat-panel__empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.4;
+  font-size: 14px;
+}
+
+/* ── 消息气泡 ────────────────────────────────────────── */
+
+.chat-msg {
+  display: flex;
+  max-width: 85%;
+}
+
+.chat-msg--user {
+  align-self: flex-end;
+}
+
+.chat-msg--assistant {
+  align-self: flex-start;
+}
+
+.chat-msg__bubble {
+  padding: 8px 14px;
+  border-radius: 14px;
+  font-size: 14px;
+  line-height: 1.5;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.chat-msg--user .chat-msg__bubble {
+  background: linear-gradient(145deg, #ff9441, #e8550a);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+.chat-msg--assistant .chat-msg__bubble {
+  background: rgba(50, 50, 56, 0.9);
+  color: #f0f0f0;
+  border-bottom-left-radius: 4px;
+}
+
+/* 流式 cursor 动画 */
+.chat-msg__cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: #ff9441;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: cursor-blink 0.6s steps(2) infinite;
+}
+
+@keyframes cursor-blink {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ── 输入区域 ────────────────────────────────────────── */
+
+.chat-panel__input-area {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(28, 28, 32, 0.9);
+  flex-shrink: 0;
+}
+
+.chat-panel__input {
+  flex: 1;
+  min-height: 36px;
+  max-height: 120px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 10px;
+  background: rgba(50, 50, 56, 0.8);
+  color: #f0f0f0;
+  font-size: 14px;
+  line-height: 1.4;
+  resize: none;
+  outline: none;
+  font-family: inherit;
+  transition: box-shadow 0.15s ease;
+}
+
+.chat-panel__input::placeholder {
+  color: rgba(240, 240, 240, 0.35);
+}
+
+.chat-panel__input:focus {
+  box-shadow: 0 0 0 2px rgba(255, 148, 65, 0.4);
+}
+
+.chat-panel__send {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #ff9441, #e8550a);
+  color: #fff;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition:
+    opacity 0.15s ease,
+    transform 0.1s ease;
+}
+
+.chat-panel__send:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.chat-panel__send:not(:disabled):hover {
+  transform: scale(1.08);
+}
+
+.chat-panel__send:not(:disabled):active {
+  transform: scale(0.92);
+}

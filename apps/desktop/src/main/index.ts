@@ -1,8 +1,9 @@
-import { app, BrowserWindow, ipcMain, screen } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu, screen } from 'electron'
 import { join } from 'path'
 import { startBackend } from '@desktop-claw/backend'
 
 let ballWin: BrowserWindow | null = null
+let panelWin: BrowserWindow | null = null
 let backendHandle: { close: () => Promise<void> } | null = null
 
 /** 拖拽时记录光标相对于窗口左上角的偏移量 */
@@ -100,6 +101,7 @@ ipcMain.handle('ipc:ping', () => {
 // ── IPC: QuickInput 条形输入框 ─────────────────────────────
 let quickInputVisible = false
 let savedBallBounds: Electron.Rectangle | null = null
+let qiDirection: 'left' | 'right' = 'left'
 const EXPANDED_W = 420
 const BALL_EDGE_OFFSET = 40 // 球中心距最近窗口边缘的距离
 
@@ -146,7 +148,168 @@ ipcMain.handle('quickinput:toggle', () => {
   })
 
   quickInputVisible = true
+  qiDirection = direction
   return { visible: true, direction }
+})
+
+// 拖拽结束后，若 QuickInput 处于展开态，根据新位置重算方向
+ipcMain.handle('quickinput:reposition', () => {
+  if (!ballWin || !quickInputVisible) return null
+
+  const bounds = ballWin.getBounds()
+
+  // 当前球在窗口内的屏幕中心 X（取决于当前 direction）
+  // direction=left → 球列在窗口右侧; direction=right → 球列在窗口左侧
+  // 为简化，直接用 savedBallBounds 的球中心 + 拖拽偏移量
+  // 拖拽移动的是整个窗口，球列宽 80px，球居中
+  const oldDir = savedBallBounds
+    ? (savedBallBounds.x < bounds.x - 100 ? 'right' : 'left')
+    : 'left'
+
+  // 从当前 bounds 反推球的屏幕中心 X
+  // direction=left: 球列在右侧 → ballCenterX = bounds.x + bounds.width - 40
+  // direction=right: 球列在左侧 → ballCenterX = bounds.x + 40
+  // 但拖拽是整体移动，我们直接用窗口中心来判断新方向
+  const windowCenterX = bounds.x + Math.round(bounds.width / 2)
+  const display = screen.getDisplayNearestPoint({
+    x: windowCenterX,
+    y: bounds.y + Math.round(bounds.height / 2)
+  })
+  const screenCenterX = display.workArea.x + Math.round(display.workArea.width / 2)
+  const newDirection: 'left' | 'right' = windowCenterX > screenCenterX ? 'left' : 'right'
+
+  // 从当前 bounds 推算球的实际屏幕位置，得到收起后的 savedBallBounds
+  // 当前展开 direction 决定球列在哪侧
+  const currentDirection = qiDirection
+  let ballColumnX: number
+  if (currentDirection === 'left') {
+    // 球列在窗口右侧
+    ballColumnX = bounds.x + bounds.width - 80
+  } else {
+    // 球列在窗口左侧
+    ballColumnX = bounds.x
+  }
+  // 球中心在 ballColumnX + 40，savedBallBounds.x = ballCenterX - BALL_WIN_W/2
+  const ballCenterX = ballColumnX + 40
+  savedBallBounds = {
+    x: ballCenterX - Math.round(BALL_WIN_W / 2),
+    y: bounds.y,
+    width: BALL_WIN_W,
+    height: BALL_WIN_H
+  }
+
+  // 如果方向变了，需要重新布局窗口
+  if (newDirection !== currentDirection) {
+    let newX: number
+    if (newDirection === 'left') {
+      newX = ballCenterX - (EXPANDED_W - BALL_EDGE_OFFSET)
+    } else {
+      newX = ballCenterX - BALL_EDGE_OFFSET
+    }
+    ballWin.setBounds({
+      x: Math.round(newX),
+      y: bounds.y,
+      width: EXPANDED_W,
+      height: BALL_WIN_H
+    })
+    qiDirection = newDirection
+  }
+
+  return { direction: newDirection }
+})
+
+// ── IPC: 右键上下文菜单 ───────────────────────────────────
+
+const PANEL_W = 400
+const PANEL_H = 600
+
+function createPanelWindow(): void {
+  if (panelWin) {
+    panelWin.focus()
+    return
+  }
+
+  // 定位面板在球附近（左上方）
+  let x = 100
+  let y = 100
+  if (ballWin) {
+    const ballBounds = ballWin.getBounds()
+    const display = screen.getDisplayNearestPoint({
+      x: ballBounds.x + Math.round(ballBounds.width / 2),
+      y: ballBounds.y + Math.round(ballBounds.height / 2)
+    })
+    const workArea = display.workArea
+
+    // 面板出现在球的左侧上方，若空间不够则调整
+    x = ballBounds.x - PANEL_W - 16
+    y = ballBounds.y + ballBounds.height - PANEL_H
+
+    // 防止超出屏幕
+    if (x < workArea.x) x = ballBounds.x + ballBounds.width + 16
+    if (y < workArea.y) y = workArea.y
+    if (x + PANEL_W > workArea.x + workArea.width) x = workArea.x + workArea.width - PANEL_W
+    if (y + PANEL_H > workArea.y + workArea.height) y = workArea.y + workArea.height - PANEL_H
+  }
+
+  panelWin = new BrowserWindow({
+    width: PANEL_W,
+    height: PANEL_H,
+    x,
+    y,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    skipTaskbar: false,
+    resizable: true,
+    minWidth: 320,
+    minHeight: 400,
+    hasShadow: true,
+    show: false,
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      sandbox: false
+    }
+  })
+
+  panelWin.setAlwaysOnTop(true, 'floating')
+  panelWin.on('ready-to-show', () => panelWin?.show())
+  panelWin.on('closed', () => { panelWin = null })
+
+  const panelParam = '?view=panel'
+  if (process.env['NODE_ENV'] === 'development' && process.env['ELECTRON_RENDERER_URL']) {
+    panelWin.loadURL(process.env['ELECTRON_RENDERER_URL'] + panelParam)
+  } else {
+    panelWin.loadFile(join(__dirname, '../renderer/index.html'), { search: 'view=panel' })
+  }
+}
+
+ipcMain.on('contextmenu:show', () => {
+  if (!ballWin) return
+
+  const menu = Menu.buildFromTemplate([
+    {
+      label: '打开面板',
+      click: () => {
+        createPanelWindow()
+      }
+    },
+    {
+      label: '设置',
+      click: () => {
+        // TODO: 设置面板（Milestone B）
+        console.log('[main] open Settings (not implemented yet)')
+      }
+    },
+    { type: 'separator' },
+    {
+      label: '退出 Claw',
+      click: () => {
+        app.quit()
+      }
+    }
+  ])
+
+  menu.popup({ window: ballWin })
 })
 
 // ── 启动内嵌后端 ───────────────────────────────────────────

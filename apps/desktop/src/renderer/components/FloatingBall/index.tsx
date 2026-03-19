@@ -87,12 +87,6 @@ export function FloatingBall(): React.JSX.Element {
       if (e.button !== 0) return
       e.preventDefault()
 
-      // QuickInput 展开时，点击球直接收起，不触发拖拽/单击
-      if (isQiVisible) {
-        toggleQuickInput()
-        return
-      }
-
       movedRef.current = false
       isDraggingRef.current = true
       window.electronAPI.dragStart()
@@ -118,8 +112,18 @@ export function FloatingBall(): React.JSX.Element {
           }
         }
 
-        if (!movedRef.current) {
-          if (clickTimerRef.current) {
+        if (movedRef.current && isQiVisible) {
+          // QI 展开态拖拽结束 → 重算方向
+          window.electronAPI.repositionQuickInput().then((result) => {
+            if (result) {
+              setQiState({ visible: true, direction: result.direction })
+            }
+          })
+        } else if (!movedRef.current) {
+          if (isQiVisible) {
+            // QI 展开态单击 → 收起
+            toggleQuickInput()
+          } else if (clickTimerRef.current) {
             clearTimeout(clickTimerRef.current)
             clickTimerRef.current = null
             toggleQuickInput()
@@ -142,6 +146,11 @@ export function FloatingBall(): React.JSX.Element {
     },
     [isQiVisible, toggleQuickInput, handleSingleClick]
   )
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    window.electronAPI.showContextMenu()
+  }, [])
 
   const expanded = isQiVisible
   const direction = qiState?.direction ?? 'left'
@@ -170,7 +179,7 @@ export function FloatingBall(): React.JSX.Element {
           onMouseDown={handleMouseDown}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
-          onContextMenu={(e) => e.preventDefault()}
+          onContextMenu={handleContextMenu}
           title="Claw 🐾"
         >
           <span className="ball__icon">🐾</span>

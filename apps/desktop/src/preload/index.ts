@@ -14,5 +14,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   /** QuickInput 条形输入框 */
   toggleQuickInput: (): Promise<{ visible: boolean; direction: 'left' | 'right' }> =>
-    ipcRenderer.invoke('quickinput:toggle')
+    ipcRenderer.invoke('quickinput:toggle'),
+  /** 拖拽后重算 QuickInput 方向 */
+  repositionQuickInput: (): Promise<{ direction: 'left' | 'right' } | null> =>
+    ipcRenderer.invoke('quickinput:reposition'),
+  /** 右键上下文菜单 */
+  showContextMenu: (): void => { ipcRenderer.send('contextmenu:show') }
 })

@@ -10,7 +10,7 @@
 
 **当前阶段：** Milestone A（架构闭环）  
 **最近更新：** 2026-03-19  
-**下一个目标：** A.1 右键菜单 → A.2 WebSocket 通路
+**下一个目标：** A.2 WebSocket 通路
 
 ---
 
@@ -39,6 +39,37 @@
 ---
 
 ## 开发日志
+
+### 2026-03-19｜Milestone A.1 · ChatPanel 完整面板
+
+**完成内容：**
+- `apps/desktop/src/main/index.ts`：新增 `createPanelWindow()` — 独立 BrowserWindow（400×600），frameless + 半透明 + alwaysOnTop('floating')，通过 `?view=panel` query 参数区分 UI，定位在球附近（左上方优先，自动避让屏幕边界）
+- `apps/desktop/src/main/index.ts`：右键菜单“打开面板”现已联动 `createPanelWindow()`，已存在窗口时直接 focus
+- `apps/desktop/src/renderer/components/ChatPanel/index.tsx`：ChatPanel 组件 — 消息列表（自动滚底）+ 多行输入框（Enter 发送、Shift+Enter 换行）+ 发送按钮，用户消息右对齐 / AI 消息左对齐，流式 cursor 动画预留
+- `apps/desktop/src/renderer/components/ChatPanel/styles.css`：暗色主题，圆角气泡，渐变发送按钮，头部可拖拽（-webkit-app-region: drag）
+- `apps/desktop/src/renderer/App.tsx`：通过 `URLSearchParams` 检测 `?view=panel` 路由分流，Ball 窗口和 Panel 窗口共用同一 renderer 构建
+
+**验证结果：**
+- `tsc --noEmit` → 0 错误 ✅
+
+**关键决策记录：**
+- Panel 与 Ball 共用同一 renderer 构建，通过 `?view=panel` query 参数在 App.tsx 中路由分流，避免维护两套 HTML 入口
+- Panel 窗口设为可调整大小（minWidth 320, minHeight 400），便于用户根据需要调整
+- 当前为占位 echo 回复，流式 token 和共享对话历史待 A.2 WebSocket 接入后实现
+
+### 2026-03-19｜Milestone A.1 · 右键上下文菜单
+
+**完成内容：**
+- `apps/desktop/src/main/index.ts`：新增 `contextmenu:show` IPC handler，使用 Electron `Menu.buildFromTemplate` 构建原生菜单（打开面板 / 设置 / 分割线 / 退出 Claw）
+- `apps/desktop/src/preload/index.ts` + `renderer/env.d.ts`：新增 `showContextMenu()` IPC 通道与类型声明
+- `apps/desktop/src/renderer/components/FloatingBall/index.tsx`：`onContextMenu` 从 `preventDefault` 改为调用 `showContextMenu()` 唤起原生菜单
+
+**验证结果：**
+- `tsc --noEmit` → 0 错误 ✅
+
+**关键决策记录：**
+- 采用 Electron 原生 Menu 而非自绘 React 菜单，保证系统级观感且不需要额外窗口管理
+- “打开面板”和“设置”当前为占位 console.log，待对应模块实现后替换
 
 ### 2026-03-19｜Milestone A.1 · 双击 QuickInput 条形输入框
 

@@ -14,6 +14,10 @@ declare global {
       setIgnoreMouseEvents: (ignore: boolean) => void
       /** QuickInput 条形输入框 */
       toggleQuickInput: () => Promise<{ visible: boolean; direction: 'left' | 'right' }>
+      /** 拖拽后重算 QuickInput 方向 */
+      repositionQuickInput: () => Promise<{ direction: 'left' | 'right' } | null>
+      /** 右键上下文菜单 */
+      showContextMenu: () => void
     }
   }
 }
