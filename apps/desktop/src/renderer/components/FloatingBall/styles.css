@@ -18,12 +18,22 @@ body,
 
 .ball-root {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
+  flex-direction: row;
+  align-items: flex-end;
+  justify-content: center;
   width: 100vw;
   height: 100vh;
   padding-bottom: 8px;
+}
+
+/* ── 球 + 气泡纵列 ───────────────────────────── */
+.ball-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  flex-shrink: 0;
 }
 
 /* 气泡显示区域 — 球上方，不拦截鼠标 */
@@ -36,6 +46,19 @@ body,
   width: 100%;
   padding: 8px;
   pointer-events: none;
+}
+
+/* ── 展开态（QuickInput 可见）─────────────────── */
+.ball-root--expanded .ball-column {
+  width: 80px;
+}
+
+.qi-area {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  min-width: 0;
+  padding-bottom: 4px;
 }
 
 .ball {

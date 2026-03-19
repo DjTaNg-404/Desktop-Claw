@@ -11,5 +11,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   /** 透明区域点击穿透控制 */
   setIgnoreMouseEvents: (ignore: boolean): void => {
     ipcRenderer.send('set-ignore-mouse-events', ignore)
-  }
+  },
+  /** QuickInput 条形输入框 */
+  toggleQuickInput: (): Promise<{ visible: boolean; direction: 'left' | 'right' }> =>
+    ipcRenderer.invoke('quickinput:toggle')
 })

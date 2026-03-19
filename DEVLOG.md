@@ -10,7 +10,7 @@
 
 **当前阶段：** Milestone A（架构闭环）  
 **最近更新：** 2026-03-19  
-**下一个目标：** A.1 双击 QuickInput + 右键菜单 → A.2 WebSocket 通路
+**下一个目标：** A.1 右键菜单 → A.2 WebSocket 通路
 
 ---
 
@@ -39,6 +39,24 @@
 ---
 
 ## 开发日志
+
+### 2026-03-19｜Milestone A.1 · 双击 QuickInput 条形输入框
+
+**完成内容：**
+- `apps/desktop/src/main/index.ts`：新增 `quickinput:toggle` IPC handler — 保存原始窗口 bounds，计算球相对屏幕中心的方向（left/right），动态 setBounds 将窗口从 240→420 宽展开，收起时恢复原 bounds
+- `apps/desktop/src/preload/index.ts` + `renderer/env.d.ts`：新增 `toggleQuickInput()` IPC 通道与类型声明
+- `apps/desktop/src/renderer/components/QuickInput/index.tsx`：新建条形输入框组件 — 自动聚焦、Enter 发送、Escape 关闭、mouseenter/mouseleave 控制点击穿透
+- `apps/desktop/src/renderer/components/FloatingBall/index.tsx`：重写交互逻辑 — 双击调用 `toggleQuickInput()` 展开/收起输入框；QuickInput 展开时点击球即收起；发送消息后 bubble echo 占位回复
+- `apps/desktop/src/renderer/components/FloatingBall/styles.css`：布局从 column 改为 row-based — 新增 `.ball-column`、`.qi-area`、`.ball-root--expanded` 展开态样式
+
+**验证结果：**
+- `tsc --noEmit` → 0 错误 ✅
+
+**关键决策记录：**
+- QuickInput 采用同窗口 resize 方案（而非独立 BrowserWindow），避免多窗口 IPC 协调复杂度
+- 方向自适应：主进程通过 `screen.getDisplayNearestPoint()` 获取显示器，球中心在屏幕右半时输入框向左展开，反之向右
+- QuickInput 展开时，球上 mousedown 直接收起输入框并 return，不进入拖拽/单双击检测流程
+- 发送后暂用占位气泡回复（`收到「...」🐾`），待 A.2 WebSocket 接通后替换为真实 AI 回复
 
 ### 2026-03-19｜Milestone A.1 · 悬浮球单击交互 + 气泡组件
 

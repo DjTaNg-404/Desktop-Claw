@@ -97,6 +97,58 @@ ipcMain.handle('ipc:ping', () => {
   return 'pong from main 🐾'
 })
 
+// ── IPC: QuickInput 条形输入框 ─────────────────────────────
+let quickInputVisible = false
+let savedBallBounds: Electron.Rectangle | null = null
+const EXPANDED_W = 420
+const BALL_EDGE_OFFSET = 40 // 球中心距最近窗口边缘的距离
+
+ipcMain.handle('quickinput:toggle', () => {
+  if (!ballWin) return { visible: false, direction: 'left' }
+
+  if (quickInputVisible) {
+    // 收起：恢复原始窗口尺寸与位置
+    if (savedBallBounds) {
+      ballWin.setBounds(savedBallBounds)
+      savedBallBounds = null
+    }
+    quickInputVisible = false
+    ballWin.setIgnoreMouseEvents(true, { forward: true })
+    return { visible: false, direction: 'left' }
+  }
+
+  // 展开：计算方向并扩大窗口
+  const bounds = ballWin.getBounds()
+  savedBallBounds = { ...bounds }
+
+  const ballScreenCenterX = bounds.x + Math.round(BALL_WIN_W / 2)
+  const display = screen.getDisplayNearestPoint({
+    x: ballScreenCenterX,
+    y: bounds.y + Math.round(bounds.height / 2)
+  })
+  const screenCenterX = display.workArea.x + Math.round(display.workArea.width / 2)
+  const direction: 'left' | 'right' = ballScreenCenterX > screenCenterX ? 'left' : 'right'
+
+  let newX: number
+  if (direction === 'left') {
+    // 球在右侧，输入框向左展开
+    newX = ballScreenCenterX - (EXPANDED_W - BALL_EDGE_OFFSET)
+  } else {
+    // 球在左侧，输入框向右展开
+    newX = ballScreenCenterX - BALL_EDGE_OFFSET
+  }
+
+  ballWin.setBounds({
+    x: Math.round(newX),
+    y: bounds.y,
+    width: EXPANDED_W,
+    height: BALL_WIN_H
+  })
+
+  quickInputVisible = true
+  return { visible: true, direction }
+})
+
 // ── 启动内嵌后端 ───────────────────────────────────────────
 // 后端在 app.whenReady() 内启动，确保顺序可控
 

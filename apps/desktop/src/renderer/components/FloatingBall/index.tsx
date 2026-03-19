@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { ChatBubble } from '../ChatBubble'
+import { QuickInput } from '../QuickInput'
 import './styles.css'
 
 const GREETINGS = [
@@ -15,12 +16,14 @@ const GREETINGS = [
   '陪着你呢'
 ]
 
-interface Props {
-  onDoubleClick?: () => void
+interface QuickInputState {
+  visible: boolean
+  direction: 'left' | 'right'
 }
 
-export function FloatingBall({ onDoubleClick }: Props): React.JSX.Element {
+export function FloatingBall(): React.JSX.Element {
   const [bubble, setBubble] = useState<{ id: number; text: string } | null>(null)
+  const [qiState, setQiState] = useState<QuickInputState | null>(null)
   const movedRef = useRef(false)
   const isDraggingRef = useRef(false)
   const bubbleIdRef = useRef(0)
@@ -28,7 +31,8 @@ export function FloatingBall({ onDoubleClick }: Props): React.JSX.Element {
   const ballRef = useRef<HTMLDivElement>(null)
   const listenersRef = useRef<{ onMove: () => void; onUp: (e: MouseEvent) => void } | null>(null)
 
-  // 组件卸载时保底清除 window 事件监听器
+  const isQiVisible = qiState?.visible ?? false
+
   useEffect(() => {
     return () => {
       if (listenersRef.current) {
@@ -42,17 +46,32 @@ export function FloatingBall({ onDoubleClick }: Props): React.JSX.Element {
     }
   }, [])
 
-  const handleSingleClick = useCallback(() => {
-    const text = GREETINGS[Math.floor(Math.random() * GREETINGS.length)]
+  const showBubble = useCallback((text: string) => {
     bubbleIdRef.current += 1
     setBubble({ id: bubbleIdRef.current, text })
   }, [])
+
+  const handleSingleClick = useCallback(() => {
+    const text = GREETINGS[Math.floor(Math.random() * GREETINGS.length)]
+    showBubble(text)
+  }, [showBubble])
+
+  const toggleQuickInput = useCallback(async () => {
+    const state = await window.electronAPI.toggleQuickInput()
+    setQiState(state)
+  }, [])
+
+  const handleQuickSend = useCallback(
+    (text: string) => {
+      showBubble(`收到「${text}」🐾`)
+    },
+    [showBubble]
+  )
 
   const handleBubbleDismiss = useCallback(() => {
     setBubble(null)
   }, [])
 
-  // 透明区域点击穿透：鼠标进入球时接收事件，离开时穿透
   const handleMouseEnter = useCallback(() => {
     window.electronAPI.setIgnoreMouseEvents(false)
   }, [])
@@ -65,8 +84,15 @@ export function FloatingBall({ onDoubleClick }: Props): React.JSX.Element {
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
-      if (e.button !== 0) return // 仅左键
+      if (e.button !== 0) return
       e.preventDefault()
+
+      // QuickInput 展开时，点击球直接收起，不触发拖拽/单击
+      if (isQiVisible) {
+        toggleQuickInput()
+        return
+      }
+
       movedRef.current = false
       isDraggingRef.current = true
       window.electronAPI.dragStart()
@@ -80,7 +106,6 @@ export function FloatingBall({ onDoubleClick }: Props): React.JSX.Element {
         window.electronAPI.dragEnd()
         isDraggingRef.current = false
 
-        // 检查鼠标是否仍在球上，不在则恢复点击穿透
         const rect = ballRef.current?.getBoundingClientRect()
         if (rect) {
           const isOver =
@@ -93,15 +118,12 @@ export function FloatingBall({ onDoubleClick }: Props): React.JSX.Element {
           }
         }
 
-        // 没有发生移动才算点击（区分单击 / 双击）
         if (!movedRef.current) {
           if (clickTimerRef.current) {
-            // 250ms 内第二次点击 → 双击
             clearTimeout(clickTimerRef.current)
             clickTimerRef.current = null
-            onDoubleClick?.()
+            toggleQuickInput()
           } else {
-            // 第一次点击，等待可能的双击
             clickTimerRef.current = setTimeout(() => {
               clickTimerRef.current = null
               handleSingleClick()
@@ -118,32 +140,47 @@ export function FloatingBall({ onDoubleClick }: Props): React.JSX.Element {
       window.addEventListener('mousemove', onMove)
       window.addEventListener('mouseup', onUp)
     },
-    [onDoubleClick, handleSingleClick]
+    [isQiVisible, toggleQuickInput, handleSingleClick]
   )
 
+  const expanded = isQiVisible
+  const direction = qiState?.direction ?? 'left'
+
   return (
-    <div className="ball-root">
-      <div className="bubble-area">
-        {bubble && (
-          <ChatBubble
-            key={bubble.id}
-            message={bubble}
-            duration={3000}
-            onDismiss={handleBubbleDismiss}
-          />
-        )}
+    <div className={`ball-root${expanded ? ` ball-root--expanded ball-root--${direction}` : ''}`}>
+      {expanded && direction === 'left' && (
+        <div className="qi-area">
+          <QuickInput onSend={handleQuickSend} onClose={toggleQuickInput} />
+        </div>
+      )}
+      <div className="ball-column">
+        <div className="bubble-area">
+          {bubble && (
+            <ChatBubble
+              key={bubble.id}
+              message={bubble}
+              duration={3000}
+              onDismiss={handleBubbleDismiss}
+            />
+          )}
+        </div>
+        <div
+          ref={ballRef}
+          className="ball"
+          onMouseDown={handleMouseDown}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+          onContextMenu={(e) => e.preventDefault()}
+          title="Claw 🐾"
+        >
+          <span className="ball__icon">🐾</span>
+        </div>
       </div>
-      <div
-        ref={ballRef}
-        className="ball"
-        onMouseDown={handleMouseDown}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        onContextMenu={(e) => e.preventDefault()}
-        title="Claw 🐾"
-      >
-        <span className="ball__icon">🐾</span>
-      </div>
+      {expanded && direction === 'right' && (
+        <div className="qi-area">
+          <QuickInput onSend={handleQuickSend} onClose={toggleQuickInput} />
+        </div>
+      )}
     </div>
   )
 }

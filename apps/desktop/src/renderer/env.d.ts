@@ -12,6 +12,8 @@ declare global {
       dragEnd: () => void
       /** 透明区域点击穿透控制 */
       setIgnoreMouseEvents: (ignore: boolean) => void
+      /** QuickInput 条形输入框 */
+      toggleQuickInput: () => Promise<{ visible: boolean; direction: 'left' | 'right' }>
     }
   }
 }
