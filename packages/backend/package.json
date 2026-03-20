@@ -10,10 +10,14 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "fastify": "^5.8.2"
+    "@desktop-claw/shared": "workspace:*",
+    "@fastify/websocket": "^11.2.0",
+    "fastify": "^5.8.2",
+    "ws": "^8.19.0"
   },
   "devDependencies": {
     "@types/node": "^20.19.37",
+    "@types/ws": "^8.18.1",
     "tsx": "^4.0.0",
     "typescript": "^5.4.0"
   }

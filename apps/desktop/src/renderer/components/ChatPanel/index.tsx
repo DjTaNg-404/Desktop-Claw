@@ -1,17 +1,10 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react'
+import { useClawSocket } from '../../hooks/useClawSocket'
 import './styles.css'
 
-export interface ChatMessage {
-  id: number
-  role: 'user' | 'assistant'
-  content: string
-  streaming?: boolean
-}
-
 export function ChatPanel(): React.JSX.Element {
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const { connected, messages, sendMessage } = useClawSocket()
   const [inputText, setInputText] = useState('')
-  const msgIdRef = useRef(0)
   const listRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -24,25 +17,13 @@ export function ChatPanel(): React.JSX.Element {
 
   const handleSend = useCallback(() => {
     const text = inputText.trim()
-    if (!text) return
+    if (!text || !connected) return
 
-    msgIdRef.current += 1
-    const userMsg: ChatMessage = { id: msgIdRef.current, role: 'user', content: text }
-
-    // 占位 AI 回复（待 A.2 WebSocket 接通后替换）
-    msgIdRef.current += 1
-    const aiMsg: ChatMessage = {
-      id: msgIdRef.current,
-      role: 'assistant',
-      content: `收到「${text}」🐾`
-    }
-
-    setMessages((prev) => [...prev, userMsg, aiMsg])
+    sendMessage(text)
     setInputText('')
 
-    // 发送后重新聚焦输入框
     setTimeout(() => inputRef.current?.focus(), 0)
-  }, [inputText])
+  }, [inputText, connected, sendMessage])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -86,13 +67,14 @@ export function ChatPanel(): React.JSX.Element {
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="输入消息... (Enter 发送, Shift+Enter 换行)"
+          placeholder={connected ? '输入消息... (Enter 发送, Shift+Enter 换行)' : '连接中...'}
           rows={1}
+          disabled={!connected}
         />
         <button
           className="chat-panel__send"
           onClick={handleSend}
-          disabled={!inputText.trim()}
+          disabled={!inputText.trim() || !connected}
           title="发送"
         >
           ↑

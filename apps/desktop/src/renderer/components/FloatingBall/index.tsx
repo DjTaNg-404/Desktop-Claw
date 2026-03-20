@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { ChatBubble } from '../ChatBubble'
 import { QuickInput } from '../QuickInput'
+import { useClawSocket } from '../../hooks/useClawSocket'
 import './styles.css'
 
 const GREETINGS = [
@@ -22,6 +23,7 @@ interface QuickInputState {
 }
 
 export function FloatingBall(): React.JSX.Element {
+  const { messages, sendMessage } = useClawSocket()
   const [bubble, setBubble] = useState<{ id: number; text: string } | null>(null)
   const [qiState, setQiState] = useState<QuickInputState | null>(null)
   const movedRef = useRef(false)
@@ -30,8 +32,20 @@ export function FloatingBall(): React.JSX.Element {
   const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const ballRef = useRef<HTMLDivElement>(null)
   const listenersRef = useRef<{ onMove: () => void; onUp: (e: MouseEvent) => void } | null>(null)
+  const prevMsgCountRef = useRef(0)
 
   const isQiVisible = qiState?.visible ?? false
+
+  // 监听新的 AI 消息 → 显示为气泡
+  useEffect(() => {
+    if (messages.length > prevMsgCountRef.current) {
+      const latest = messages[messages.length - 1]
+      if (latest && latest.role === 'assistant' && !latest.streaming && latest.content) {
+        showBubble(latest.content)
+      }
+    }
+    prevMsgCountRef.current = messages.length
+  }, [messages])
 
   useEffect(() => {
     return () => {
@@ -63,9 +77,9 @@ export function FloatingBall(): React.JSX.Element {
 
   const handleQuickSend = useCallback(
     (text: string) => {
-      showBubble(`收到「${text}」🐾`)
+      sendMessage(text)
     },
-    [showBubble]
+    [sendMessage]
   )
 
   const handleBubbleDismiss = useCallback(() => {
