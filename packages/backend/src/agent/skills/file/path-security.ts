@@ -1,4 +1,4 @@
-import { resolve, normalize, relative } from 'path'
+import { resolve, normalize, relative, isAbsolute } from 'path'
 import { realpathSync } from 'fs'
 import { homedir } from 'os'
 
@@ -43,8 +43,8 @@ export function validatePath(
   const inAllowed = allowedRoots.some((root) => {
     const normalizedRoot = normalize(resolve(root))
     const rel = relative(normalizedRoot, resolved)
-    // rel 不能以 .. 开头，且不能是绝对路径
-    return !rel.startsWith('..') && !resolve(rel).startsWith('/')
+    // rel 不能以 .. 开头（穿越），且不能是绝对路径（跨驱动器）
+    return !rel.startsWith('..') && !isAbsolute(rel)
   })
 
   if (!inAllowed) {
@@ -57,7 +57,7 @@ export function validatePath(
     const realInAllowed = allowedRoots.some((root) => {
       const normalizedRoot = normalize(resolve(root))
       const rel = relative(normalizedRoot, real)
-      return !rel.startsWith('..') && !resolve(rel).startsWith('/')
+      return !rel.startsWith('..') && !isAbsolute(rel)
     })
     if (!realInAllowed) {
       return { valid: false, resolved: real, error: `符号链接指向允许范围之外: ${real}` }

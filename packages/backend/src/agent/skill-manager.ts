@@ -1,11 +1,43 @@
 import { join } from 'path'
+import { readFileSync, existsSync } from 'fs'
 import type { ToolSchema, ToolResult, ToolDefinition } from '@desktop-claw/shared'
 import {
-  loadSkillsFromDir,
+  extractFrontmatter,
   formatSkillsForPrompt,
   collectToolSchemas,
   type LoadedSkill
 } from './skill-primitives'
+
+// 静态导入内置 tools（electron-vite 打包时能正确跟踪）
+import { readFileTool } from './skills/file/read_file'
+import { writeFileTool } from './skills/file/write_file'
+import { editFileTool } from './skills/file/edit_file'
+
+/** 内置 Skill 注册配置 */
+interface BuiltinSkillConfig {
+  name: string
+  tools: ToolDefinition[]
+}
+
+/** 内置 Skills 注册表 — 新增 Skill 时在此添加一行 */
+const BUILTIN_SKILLS: BuiltinSkillConfig[] = [
+  { name: 'file', tools: [readFileTool, writeFileTool, editFileTool] }
+]
+
+/**
+ * 解析 skills 源码目录（SKILL.md 所在位置）
+ * electron-vite 打包后 __dirname 指向 out/main/，需要多路径 fallback
+ */
+function resolveSkillsDir(): string {
+  const candidates = [
+    join(__dirname, 'skills'),
+    join(process.cwd(), 'packages/backend/src/agent/skills')
+  ]
+  for (const dir of candidates) {
+    if (existsSync(join(dir, 'file', 'SKILL.md'))) return dir
+  }
+  return candidates[0]
+}
 
 /**
  * SkillManager — Skill 体系运行时核心
@@ -19,14 +51,34 @@ export class SkillManager {
   private loaded = false
 
   /**
-   * 扫描 skills 目录，加载所有 Skill 的元数据 + 正文 + tools
-   * MVP：仅扫描内置 skills 目录
+   * 加载所有内置 Skill 的 SKILL.md + 静态注册的 tools
+   * tools 通过静态 import 注册（electron-vite 打包安全）
+   * SKILL.md 在运行时从文件系统读取（多路径 fallback）
    */
   async load(): Promise<void> {
-    // 内置 Skills 目录
-    const builtinDir = join(__dirname, 'skills')
+    const skillsDir = resolveSkillsDir()
 
-    this.skills = await loadSkillsFromDir(builtinDir)
+    for (const config of BUILTIN_SKILLS) {
+      const skillMdPath = join(skillsDir, config.name, 'SKILL.md')
+      let guide = ''
+      let meta = { name: config.name, description: '' }
+
+      if (existsSync(skillMdPath)) {
+        const raw = readFileSync(skillMdPath, 'utf-8')
+        const parsed = extractFrontmatter(raw)
+        if (parsed.meta.name) meta = parsed.meta
+        guide = parsed.body
+      } else {
+        console.warn(`[skill-manager] SKILL.md not found: ${skillMdPath}`)
+      }
+
+      this.skills.push({
+        name: config.name,
+        meta,
+        guide,
+        tools: config.tools
+      })
+    }
 
     // 构建 tool 查找表
     this.toolMap.clear()
