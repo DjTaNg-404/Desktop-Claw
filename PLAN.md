@@ -6,7 +6,7 @@
 - 技术参考：[ARCHITECTURE.md](./ARCHITECTURE.md)
 - 产品参考：[PRD.md](./PRD.md)
 - 当前阶段：Milestone B（记忆 + 人格 + 稳定性）
-- 最后更新：2026-03-21
+- 最后更新：2026-03-24
 
 ---
 
@@ -228,7 +228,7 @@ data/files/
 |------|------|-----------|
 | B.1 | Companion 人格体系 — SOUL.md + System Prompt 组装 | 让 Claw 每次对话都"是同一个 Claw"，而不是裸模型 |
 | B.2 | Memory Service — 按天归档基础设施 | `data/memory/YYYY-MM-DD.json` 读写，当日交互落盘 |
-| B.3 | 当日记忆注入 + 对话摘要压缩 | 重启不失忆 + 20 轮阈值自动摘要，解决上下文膨胀 |
+| B.3 | 当日记忆注入 + 摘要压缩 + 每日内化 | 重启不失忆 + 摘要压缩 + CONTEXT.md 每日内化 |
 | B.4 | BOOTSTRAP 首次引导 + USER.md 用户画像 | 初次见面仪式 → 收集称呼/背景/偏好 → 写入 USER.md |
 | B.5 | 断线重连 + 流式异常兜底 | WS 指数退避重连，streaming 中断时气泡降级，不挂死 |
 | B.6 | Context 精细管理 — token-aware 裁剪 | 按 token 预算裁剪历史，老 tool_result 摘要化，保护 tool_calls 序列完整 |
@@ -237,19 +237,35 @@ data/files/
 
 ### 任务清单
 
-> 各任务细节待逐项讨论后填写。
-
 #### B.1 Companion 人格体系
-- [ ] 待讨论
+- [ ] 创建 `data/persona/SOUL.md`：Claw 的人格定义（语气、性格、边界）
+- [ ] 创建 `data/persona/USER.md`：用户画像模板（首次为空，由 B.4 引导填充）
+- [ ] 创建 `data/persona/CONTEXT.md`：动态认知文件（首次为空，由每日内化填充）
+- [ ] 修改 `loop.ts`：启动时读取 SOUL.md → USER.md → CONTEXT.md，组装进 System Prompt
+- [ ] System Prompt 组装顺序：Base Prompt → SOUL.md → USER.md → CONTEXT.md → 近日摘要 → Skills Prompt
+- [ ] 扩展 `path-security.ts` 的 allowedRoots：加入 `data/persona/`、`data/memory/`
 
 #### B.2 Memory Service — 按天归档
-- [ ] 待讨论
+- [ ] `packages/backend/src/memory/memory-service.ts`：Memory Service 模块
+- [ ] 按天归档文件结构：`data/memory/YYYY-MM-DD.json`（含 date / summary / facts / messages）
+- [ ] `appendMessage(msg)`：当日对话实时追加到 messages 数组
+- [ ] `finalizeDayArchive()`：当日结束时生成 summary + facts（调用 LLM 做摘要提取）
+- [ ] `getTodayMessages()`：读取当日已有对话（用于重启恢复）
+- [ ] `getRecentSummaries(n)`：返回最近 N 天的 summary + facts（用于 System Prompt 注入）
+- [ ] 集成到 `ws.ts`：每条 user/assistant 消息落盘到当日 JSON
 
-#### B.3 当日记忆注入 + 摘要压缩
-- [ ] 待讨论
+#### B.3 当日记忆注入 + 摘要压缩 + 每日内化
+- [ ] 启动时注入：读取最近 N 天（默认 7 天）的 summary/facts，拼入 System Prompt
+- [ ] 重启恢复：启动时从当日 JSON 的 messages 恢复内存中的 conversation
+- [ ] 摘要压缩触发：当日对话超过阈值（20 轮）时，对旧对话做 LLM 摘要，压缩 messages
+- [ ] 每日内化：当日归档完成后，LLM 读取当日快照 → 用 edit_file 更新 CONTEXT.md 和 USER.md
+- [ ] 内化的 System Prompt 引导：告诉 LLM "从今天的对话中提取值得跨天记住的信息，更新 CONTEXT.md；如果发现新的用户偏好，更新 USER.md"
 
 #### B.4 BOOTSTRAP 首次引导 + USER.md
-- [ ] 待讨论
+- [ ] 首次检测：启动时检查 `data/persona/USER.md` 是否为空/不存在
+- [ ] 引导对话：触发特殊 System Prompt（BOOTSTRAP 模式），引导 Claw 主动询问用户称呼、背景、偏好
+- [ ] 引导完成后：LLM 用 write_file / edit_file 将收集到的信息写入 USER.md
+- [ ] 状态标记：引导完成后写入标记，后续启动不再触发
 
 #### B.5 断线重连 + 流式异常兜底
 - [ ] 待讨论
@@ -267,6 +283,7 @@ data/files/
 - [ ] Claw 有稳定人格（SOUL.md 注入），重启后风格一致
 - [ ] 当日对话按天落盘，重启后能续上今天的上下文
 - [ ] 超过 20 轮自动摘要压缩，不爆上下文
+- [ ] CONTEXT.md 每日内化，体现跨天的动态认知积累
 - [ ] 首次使用有引导仪式，USER.md 记录用户偏好
 - [ ] WS 断线自动重连，流式中断不挂死
 - [ ] 面板可按日历查看历史对话
@@ -294,6 +311,100 @@ data/files/
 | 2026-03-18 | 架构模式 | Gateway + 最小 Command Queue + Agent Loop | 来自 OpenClaw/Hello-Claw 实践，已验证可行 | 纯同步请求-响应（忽略并发/超时问题）|
 | 2026-03-18 | 记忆策略 | Day-bucket（按天归档 JSON） | 实现简单，符合"日历式陪伴"产品形态 | 向量数据库检索（过度设计，MVP 不需要）|
 | 2026-03-18 | 会话模型 | 单主对话（无多会话 UI） | 桌宠不需要多会话，内部 taskId 保留并发控制位 | 多 Tab 会话（增加 UI 复杂度，违反简洁原则）|
+| 2026-03-24 | 记忆文档分类 | 活文档 + 快照文档二元模型 | 见下方"记忆模型设计原则" | 全部 append-only（丢失"成长感"）|
+| 2026-03-24 | 每日归档存储 | 全量保留 + 附加摘要（不销毁原始对话） | 存储廉价，遗忘不可逆；摘要用于快速注入，原始对话用于深度回溯 | 事实提取后销毁（有损、不可逆、无法还原原始对话）|
+| 2026-03-24 | 记忆检索方式 | LLM 在 ReAct 循环中自主决策，非固定前置管线 | 数据量小（一年 365 文件），不需要向量库；复用现有 read_file 能力即可 | 传统 RAG（embedding + 向量检索，过度设计）|
+| 2026-03-24 | 动态认知文件 | 新增 `CONTEXT.md` 活文档，由 LLM 通过每日内化自主维护 | 借鉴 supermemory 的 static/dynamic 分层；不预设固定结构，LLM 自主演化内容 | 知识图谱引擎（supermemory 级别，过度设计）|
+
+### 记忆模型设计原则（2026-03-24 确立）
+
+> **核心**：活文档是"认知"，快照文档是"经历"。认知可以修正，经历不可篡改。两者结合才构成一个有成长感的桌宠记忆。
+
+**活文档（Living Document）— 成长的结果**
+
+持续读写、反复修订的文件，体现的是 Claw **此刻**对用户的认知。你看到的永远是最新版。
+
+| 文件 | 内容 | 更新方式 |
+|------|------|---------|
+| `SOUL.md` | Claw 的人格定义 | 基本不变，极少修订 |
+| `USER.md` | 用户画像（称呼、偏好、习惯） | Claw 在对话中发现新信息时主动 edit_file |
+| `CONTEXT.md` | 从日常对话中内化的动态认知 | 每日内化时由 LLM 自主更新（见下方"每日内化机制"） |
+| `config.json` | 用户配置 | 用户通过设置面板修改 |
+
+**快照文档（Snapshot）— 成长的过程**
+
+当天写入、次日封存、永不回改。记录的是"那一天发生了什么"，是成长轨迹的不可篡改证据。
+
+| 文件 | 内容 | 生命周期 |
+|------|------|---------|
+| `memory/YYYY-MM-DD.json` | 当天对话记录 + 摘要 | 当天写入 → 次日封存 |
+
+**为什么这样分？**
+- 活文档回答：**"Claw 现在认为你是谁？"**
+- 快照文档回答：**"Claw 是怎么一步步认识你的？"**
+- 合起来 = 有成长感的完整记忆
+
+### 每日内化机制（2026-03-24 确立）
+
+> **原则**：经历 → 记录 → 内化。快照是"记录"，内化是把快照中的认知沉淀到活文档里。
+
+`CONTEXT.md` 是 Claw 从日常对话中持续内化的动态认知文件。与 `USER.md`（用户是谁）不同，`CONTEXT.md` 记录的是**我们之间的共同认知**——进行中的事项、形成的共识、值得跨天记住的信息。
+
+**设计要点：**
+- **不预设固定结构**：不规定章节、不规定格式。LLM 自己判断什么值得记、怎么组织
+- **LLM 自主演化**：每天对话结束做内化时，LLM 从当天快照中提取值得沉淀的信息，用 `edit_file` 更新 `CONTEXT.md`——新增、修改、删除过时条目
+- **灵感来源**：借鉴 [supermemory](https://github.com/supermemoryai/supermemory) 的 `profile.static`（≈ USER.md）+ `profile.dynamic`（≈ CONTEXT.md）分层，但用纯本地 Markdown + LLM 自主维护替代知识图谱引擎
+
+**USER.md vs CONTEXT.md 的区别：**
+
+| | USER.md | CONTEXT.md |
+|---|---|---|
+| 记录的是 | 用户是谁 | 我们之间的共同认知 |
+| 举例 | "叫小唐，CS 专业" | "正在做 Milestone B，记忆系统设计中" |
+| 类比 | 个人档案 | 共享备忘录 |
+
+### 每日归档存储策略（2026-03-24 确立）
+
+> **原则**：存储是廉价的，遗忘是昂贵的。全存不删，摘要只是索引而非替代。
+
+每天的 `memory/YYYY-MM-DD.json` 同时包含两层数据：
+
+```jsonc
+{
+  "date": "2026-03-24",
+  "summary": "用户讨论了记忆系统设计，确立了活文档/快照文档模型...",
+  "facts": ["用户偏好先讨论再动手", "用户关注隐私问题"],
+  "messages": [ /* 完整的原始对话记录 */ ]
+}
+```
+
+- **summary + facts**：体积小，用于注入 System Prompt 和日历视图快速预览
+- **messages**：完整原始对话，用于深度回溯（"我上次说的原话是什么？"）
+- 不做"事实提取后销毁"——LLM 提取是有损压缩，无法预知未来哪些信息有用
+
+### 记忆检索策略（2026-03-24 确立）
+
+> **原则**：回忆是 LLM 的一次工具调用，不是每次对话的前置管线。
+
+**不走传统 RAG**（user prompt → embedding → 向量检索 → 拼上下文）。原因：
+- 数据量小：一年 365 个 JSON，摘要加起来几万字，不需要向量索引
+- 索引天然有序：文件名就是日期，LLM 自己能算日期定位文件
+- 已有能力覆盖：`read_file` 工具可直接读历史 JSON
+
+**两级访问模式：**
+
+| 层级 | 数据源 | 加载时机 | 覆盖场景 |
+|------|--------|---------|----------|
+| L1 摘要层 | 最近 N 天的 summary/facts | 每次对话启动时注入 System Prompt | 90% 日常问答 |
+| L2 原始对话层 | 某天的完整 messages | LLM 在 ReAct 循环中主动调 read_file | 需要具体细节时 |
+
+**LLM 自主决策流程：**
+- System Prompt 告知："你已有最近几天的摘要。如果信息不足，使用 read_file 读取 `data/memory/YYYY-MM-DD.json` 获取完整对话。"
+- 日常闲聊 → 不调工具，直接回答
+- 模糊回忆 → 从已注入的摘要回答
+- 精确回溯 → 主动 read_file 读对应天的完整记录
+
+**实现方式：** 记忆检索作为 Skill 融入现有体系（`skills/memory/` 或直接复用 `read_file` + `data/memory/` 加入 allowedRoots），不需要新建检索引擎。
 
 ---
 
