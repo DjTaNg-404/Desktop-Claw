@@ -9,7 +9,7 @@
 ## 项目状态
 
 **当前阶段：** Milestone A ✅ 完成  
-**最近更新：** 2026-03-22  
+**最近更新：** 2026-03-25  
 **下一个目标：** Milestone B（能留 — 记忆 + 稳定性）
 
 ---
@@ -39,6 +39,35 @@
 ---
 
 ## 开发日志
+
+### 2026-03-25｜Agent Skills 重构：迁移至脚本架构（三层渐进式标准）
+
+**完成内容：**
+
+**代码重构（遵循 agentskills.io 开放标准）：**
+- 将 FileSkill 的工具实现从进程内 `ToolDefinition`（import + 直接调用）迁移为独立 CLI 脚本（子进程执行）
+- 新增 `skills/file/scripts/`：`read_file.ts`、`write_file.ts`、`edit_file.ts` — 独立可执行脚本，JSON argv 输入 → JSON stdout 输出
+- 新增 `skills/file/references/format-details.md` — Level 3 补充参考文档
+- 删除旧的根级 tool .ts 文件（`skills/file/read_file.ts` 等）
+- `skill-manager.ts`：移除所有静态工具导入，新增三个 meta-tool schema（`activate_skill` / `run_skill_script` / `read_skill_reference`），脚本执行通过 `child_process.execFile` + 解释器自动检测（.ts→npx tsx, .py→python3 等），30s 超时 + 1MB 输出上限
+- `skill-primitives.ts`：新增 `scanSkillSubdir()` 扫描 scripts/ 和 references/ 目录，`LoadedSkill` 扩展 `skillDir`、`scripts`、`references` 字段，`formatActiveSkillsPrompt()` 追加可用脚本和参考文档列表
+- `SKILL.md`：从工具说明重写为脚本接口描述格式（JSON 输入输出 schema）
+
+**文档同步：**
+- `ARCHITECTURE.md` 第五章全面更新（§5.1-§5.11）：核心概念（代码外置原则）、目录结构（scripts/ + references/）、SKILL.md 规范、脚本实现协议、三级加载流程（含 meta-tools 表）、SkillManager API、Agent Loop 集成流程图、安全约束（子进程隔离 + 脚本白名单）、MVP 能力规划、分阶段演进、设计检查清单
+- `PLAN.md` 同步更新：A.6 任务清单、Agent Skills 渐进式披露设计、决策日志
+
+**架构要点：**
+- 三层标准：L1 SKILL.md frontmatter（Discovery）→ L2 SKILL.md body（Activation）→ L3 scripts/ + references/（Execution）
+- 代码外置原则：脚本源码永远不进入 LLM 上下文，仅通过 JSON 接口交互
+- 解释器自动检测：支持 .ts / .js / .py / .sh 等多语言脚本
+- 安全：文件名校验（防路径穿越） + 白名单（仅已激活 Skill 的注册脚本） + 子进程沙箱
+
+**验证结果：**
+- `pnpm typecheck` → 三个包全部 0 错误 ✅
+- Git 提交并推送至远程仓库 ✅
+
+---
 
 ### 2026-03-22｜Milestone A 验收通过 🎉
 
