@@ -98,25 +98,24 @@ async function _runLoop(
   // 1. 裁剪历史
   const trimmed = trimHistory(history, MAX_HISTORY_TURNS)
 
-  // 2. 组装 system prompt（基础人格 + Skill 行为指南）
-  const systemPrompt = BASE_SYSTEM_PROMPT + sm.getSkillPrompt()
-
-  // 3. 收集 tools
-  const toolSchemas = sm.getToolSchemas()
-
-  // 4. 组装内部 messages 数组
+  // 2. 组装内部 messages 数组
   //    当前 prompt 不在 history 里，单独追加为最后一条 user 消息
   const messages: ChatMessageData[] = [...trimmed, { role: 'user', content: prompt }]
 
   // 记录初始长度，循环结束后 messages.slice(baseLen) 即为本轮新增消息
   const baseLen = messages.length
 
-  // 5. ReAct 循环
+  // 3. ReAct 循环
   for (let step = 0; step < MAX_STEPS; step++) {
     if (controller.signal.aborted) {
       onError('CANCELLED', '任务已取消')
       return
     }
+
+    // ★ 每轮重新组装 system prompt 和 tools（因为 activate_skill 会改变可用内容）
+    const systemPrompt =
+      BASE_SYSTEM_PROMPT + sm.getDiscoveryPrompt() + sm.getActiveSkillPrompt()
+    const toolSchemas = sm.getActiveToolSchemas()
 
     // 调用 LLM
     const result = await callLLM(messages, onToken, controller, systemPrompt, toolSchemas)

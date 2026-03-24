@@ -14,10 +14,18 @@ export interface LoadedSkill {
   name: string
   /** YAML frontmatter 元数据 */
   meta: SkillMeta
-  /** SKILL.md 正文（注入 system prompt） */
+  /** SKILL.md 正文（激活后注入 system prompt） */
   guide: string
   /** 该 Skill 下的所有 Tool 定义 */
   tools: ToolDefinition[]
+  /** 是否已激活（激活后 guide + tools 才暴露给 LLM） */
+  active: boolean
+  /** Skill 目录绝对路径（用于定位 scripts/ 和 references/） */
+  skillDir: string
+  /** scripts/ 目录下的可执行脚本文件名（Level 3） */
+  scripts: string[]
+  /** references/ 目录下的参考文档文件名（Level 3） */
+  references: string[]
 }
 
 // ─── YAML Frontmatter 解析 ────────────────────
@@ -97,11 +105,19 @@ export async function loadSkillsFromDir(skillsDir: string): Promise<LoadedSkill[
     // 加载 tool .ts 文件
     const tools = await loadToolsFromSkillDir(skillPath)
 
+    // Level 3: 扫描 scripts/ 和 references/ 子目录
+    const scripts = scanSkillSubdir(skillPath, 'scripts')
+    const references = scanSkillSubdir(skillPath, 'references')
+
     skills.push({
       name: meta.name,
       meta,
       guide: body,
-      tools
+      tools,
+      active: false,
+      skillDir: skillPath,
+      scripts,
+      references
     })
   }
 
@@ -152,11 +168,75 @@ function isToolDefinition(val: unknown): val is ToolDefinition {
   )
 }
 
+// ─── Level 3: 子目录扫描（scripts/ & references/）────
+
+/**
+ * 扫描 Skill 目录下的子目录，返回其中的文件名列表
+ * 用于获取 scripts/ 和 references/ 中的文件
+ */
+export function scanSkillSubdir(skillDir: string, subdir: string): string[] {
+  const dir = join(skillDir, subdir)
+  if (!existsSync(dir)) return []
+  try {
+    if (!statSync(dir).isDirectory()) return []
+  } catch {
+    return []
+  }
+  return readdirSync(dir).filter((f) => {
+    try {
+      return !statSync(join(dir, f)).isDirectory()
+    } catch {
+      return false
+    }
+  })
+}
+
 // ─── System Prompt 格式化 ─────────────────────
 
 /**
- * 将已加载的 Skills 格式化为 system prompt 片段
- * 以 XML-like 标签包裹每个 Skill 的行为指南
+ * Discovery 阶段：仅输出每个 Skill 的 name + description 摘要
+ * 用于注入 System Prompt，让 LLM 知道有哪些技能可激活
+ * 每个 skill 约 30-50 tokens，远小于完整 SKILL.md
+ */
+export function formatDiscoveryPrompt(skills: LoadedSkill[]): string {
+  const inactive = skills.filter((s) => !s.active && s.meta.description)
+  if (inactive.length === 0) return ''
+
+  const lines = inactive.map((s) => `- **${s.meta.name}**: ${s.meta.description}`)
+  return `\n## 可用技能（使用 activate_skill 工具激活后即可使用）\n\n${lines.join('\n')}`
+}
+
+/**
+ * Activation 阶段：输出已激活 Skill 的完整行为指南
+ * 以 XML-like 标签包裹每个 Skill 的 SKILL.md 正文
+ */
+export function formatActiveSkillsPrompt(skills: LoadedSkill[]): string {
+  const active = skills.filter((s) => s.active && s.guide)
+  if (active.length === 0) return ''
+
+  const sections = active.map((s) => {
+    let content = s.guide
+
+    // Level 3: 列出可用脚本
+    if (s.scripts.length > 0) {
+      content += '\n\n### 可用脚本\n\n使用 `run_skill_script` 工具执行以下脚本（脚本源码不会进入对话，只返回执行结果）：\n'
+      content += s.scripts.map((sc) => `- \`${sc}\``).join('\n')
+    }
+
+    // Level 3: 列出参考文档
+    if (s.references.length > 0) {
+      content += '\n\n### 参考文档\n\n需要更详细信息时，使用 `read_skill_reference` 工具读取：\n'
+      content += s.references.map((r) => `- \`${r}\``).join('\n')
+    }
+
+    return `<skill name="${s.name}">\n${content}\n</skill>`
+  })
+  return `\n## 已激活技能\n\n${sections.join('\n\n')}`
+}
+
+/**
+ * 将已加载的 Skills 格式化为 system prompt 片段（兼容旧接口，全量输出）
+ * @deprecated 迁移到 formatDiscoveryPrompt + formatActiveSkillsPrompt
  */
 export function formatSkillsForPrompt(skills: LoadedSkill[]): string {
   if (skills.length === 0) return ''
