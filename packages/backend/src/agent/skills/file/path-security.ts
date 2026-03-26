@@ -1,5 +1,5 @@
 import { resolve, normalize, relative, isAbsolute } from 'path'
-import { realpathSync } from 'fs'
+import { realpathSync, existsSync } from 'fs'
 import { homedir } from 'os'
 
 /** 敏感路径前缀（绝对禁止访问） */
@@ -74,11 +74,25 @@ export function validatePath(
  */
 export function getDefaultAllowedRoots(): string[] {
   const home = homedir()
-  return [
+  const roots = [
     resolve(home, 'Desktop'),
     resolve(home, 'Documents'),
     resolve(home, 'Downloads'),
-    // 项目 data 目录
-    resolve(__dirname, '..', '..', '..', '..', 'data')
   ]
+
+  // 项目 data/ 目录：多候选路径（脚本 CLI 执行 vs electron-vite 打包后路径不同）
+  const dataCandidates = [
+    resolve(__dirname, '..', '..', '..', '..', '..', '..', 'data'),   // from skills/file/ (6 levels to project root)
+    resolve(__dirname, '..', '..', '..', '..', 'data'),               // from out/main/ (electron-vite bundled)
+    resolve(process.cwd(), 'data'),                                    // fallback: cwd-based
+  ]
+
+  for (const candidate of dataCandidates) {
+    if (existsSync(candidate)) {
+      roots.push(resolve(candidate))
+      break
+    }
+  }
+
+  return roots
 }

@@ -37,6 +37,8 @@ export interface ChatMessageData {
   tool_calls?: ToolCall[]
   /** tool 消息对应的 tool_call id */
   tool_call_id?: string
+  /** 表情 hook：assistant 消息附带的情绪标签（happy/thinking/surprised/…），前端暂忽略，为桌宠化动画预留 */
+  emotion?: string
 }
 
 export interface ConversationHistoryPayload {

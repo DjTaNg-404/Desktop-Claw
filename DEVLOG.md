@@ -8,9 +8,9 @@
 
 ## 项目状态
 
-**当前阶段：** Milestone A ✅ 完成  
-**最近更新：** 2026-03-25  
-**下一个目标：** Milestone B（能留 — 记忆 + 稳定性）
+**当前阶段：** Milestone B 🔄 进行中  
+**最近更新：** 2026-03-26  
+**当前进度：** B.1 Companion 人格体系 ✅ 完成
 
 ---
 
@@ -33,12 +33,54 @@
 |--------|------|------|
 | Milestone 0 | 架构设计、技术选型、脚手架搭建 | ✅ 完成 |
 | Milestone A | 架构闭环（Gateway + Agent Loop + 三工具） | ✅ 完成 |
-| Milestone B | 体验稳定（取消/超时/记忆归档） | 🔲 未开始 |
+| Milestone B | 体验稳定（取消/超时/记忆归档） | � 进行中 |
 | Milestone C | 可扩展（测试基线 + 扩展位预留） | 🔲 未开始 |
 
 ---
 
 ## 开发日志
+
+### 2026-03-26｜B.1 Companion 人格体系 — System Prompt 5 层组装 + 效果验证
+
+**完成内容：**
+
+**人格文件（data/persona/）：**
+- `SOUL.md`：Claw 人格核心定义 — 身份（桌面伙伴非助手）、性格基调（温暖不讨好/好奇主动/轻松幽默/靠谱负责）、语气风格（中文口语、不说"您"）、能力边界、关系定位、演化规则
+- `USER.md`：用户画像模板（首次为空，待 B.4 BOOTSTRAP 引导填充）
+- `CONTEXT.md`：动态认知模板（首次为空，待每日内化填充）
+
+**System Prompt 5 层组装（prompt-assembler.ts）：**
+- Layer 1 Base Prompt：当前日期时间 + 回复规范 + 记忆引导语（recall_memory / search_memory）
+- Layer 2 SOUL.md：人格核心，最高优先级锁定角色不漂移
+- Layer 3 USER.md：用户画像（空模板自动跳过，content.length ≤ 150 时不注入）
+- Layer 4 CONTEXT.md：动态认知（空模板自动跳过）
+- Layer 5 Skills：Discovery 摘要 + 已激活 Skill 行为指南（由 SkillManager 提供）
+- Layer 6 [BOOTSTRAP.md]：仅首次引导时存在（文件不存在则跳过）
+- stat 缓存机制：Map<filePath, {mtimeMs, content}>，mtime 未变化直接命中缓存，100 次调用 < 10ms
+
+**loop.ts 集成改造：**
+- 移除原硬编码 `BASE_SYSTEM_PROMPT` 常量
+- 每轮 ReAct 迭代调用 `assembleSystemPrompt(sm.getDiscoveryPrompt(), sm.getActiveSkillPrompt())`，动态组装
+
+**配套修改：**
+- `path-security.ts`：修复 data/ 路径解析 bug（多候选路径 + existsSync 验证），将 persona/ 和 memory/ 加入 allowedRoots
+- `ChatMessageData`：新增 `emotion?: string` 字段，为桌宠化动画预留表情 hook
+
+**验证结果：**
+
+*机制层（prompt-assembler 单元验证）：*
+- 21/21 项测试全部通过 ✅
+- 验证项：5 层结构完整性、层级顺序、空模板过滤、BOOTSTRAP 缺失处理、stat 缓存性能（100 次 < 10ms）
+
+*效果层（实际对话人格表现）：*
+- 语气风格（"你好呀"）：口语化、emoji 适度、自称小伙伴 ✅
+- 能力边界（"写毕业论文"）：不硬拒，先澄清需求再说明边界 ✅
+- 坦诚度（"Wi-Fi 密码"）：坦诚说不知道，给出实用替代建议 ✅
+- 技能触发（"读桌面 test.md"）：正确触发 file skill，路径不存在时坦诚说明 ✅
+
+**下一步：** B.2 Memory Service — 按天归档基础设施
+
+---
 
 ### 2026-03-25｜Agent Skills 重构：迁移至脚本架构（三层渐进式标准）
 

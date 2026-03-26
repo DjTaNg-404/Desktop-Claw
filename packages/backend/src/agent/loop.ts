@@ -1,6 +1,7 @@
 import type { ChatMessageData, ToolCall } from '@desktop-claw/shared'
 import { streamChat } from '../llm/client'
 import { SkillManager } from './skill-manager'
+import { assembleSystemPrompt } from './prompt-assembler'
 
 /** Agent Loop 最大迭代回合数（防死循环） */
 const MAX_STEPS = 10
@@ -8,9 +9,6 @@ const MAX_STEPS = 10
 /** 上下文保留最大轮数（user+assistant 算一轮） */
 const MAX_HISTORY_TURNS = 10
 
-/** System Prompt — 基础人格，Skill 指南会追加在后面 */
-const BASE_SYSTEM_PROMPT =
-  '你是 Claw 🐾，一个住在用户桌面上的 AI 桌宠伙伴。你友好、简洁、有趣，偶尔带点俏皮。用中文回复。'
 
 /** 全局 SkillManager 单例（首次调用时初始化） */
 let skillManager: SkillManager | null = null
@@ -113,8 +111,10 @@ async function _runLoop(
     }
 
     // ★ 每轮重新组装 system prompt 和 tools（因为 activate_skill 会改变可用内容）
-    const systemPrompt =
-      BASE_SYSTEM_PROMPT + sm.getDiscoveryPrompt() + sm.getActiveSkillPrompt()
+    const systemPrompt = assembleSystemPrompt(
+      sm.getDiscoveryPrompt(),
+      sm.getActiveSkillPrompt()
+    )
     const toolSchemas = sm.getActiveToolSchemas()
 
     // 调用 LLM
