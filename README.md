@@ -12,7 +12,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6.svg)](https://www.typescriptlang.org/)
 [![Electron](https://img.shields.io/badge/Electron-latest-47848f.svg)](https://www.electronjs.org/)
 
-[提交 Issue](https://github.com/DjTaNg-404/Desktop-Claw/issues)
+[下载最新版本](https://github.com/DjTaNg-404/Desktop-Claw/releases/latest) · [提交 Issue](https://github.com/DjTaNg-404/Desktop-Claw/issues)
 
 </div>
 
@@ -97,14 +97,19 @@ Memory Service (按天 JSON 归档 + 每日内化)
 
 ## 快速开始
 
-### 前置要求
+### 直接下载（推荐）
 
-- Node.js 20+
-- pnpm 9+
-- macOS 13+
-- 一个支持 Function Calling 的 LLM API Key（如 DeepSeek、OpenAI 等）
+前往 [Releases](https://github.com/DjTaNg-404/Desktop-Claw/releases/latest) 下载最新 `.dmg` 安装包。
 
-### 安装与运行
+1. 双击 `.dmg`，拖入 Applications
+2. 首次打开需在「系统设置 → 隐私与安全性」中点"仍要打开"（未签名应用）
+3. 右键悬浮球 → 设置，填写 LLM API Key
+
+> 当前仅支持 macOS Apple Silicon (arm64)，需要一个支持 Function Calling 的 LLM API Key（推荐 DeepSeek）。
+
+### 从源码构建
+
+前置要求：Node.js 20+ / pnpm 9+ / macOS 13+
 
 ```bash
 # 克隆仓库
