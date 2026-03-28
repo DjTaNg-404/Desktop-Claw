@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, Menu, screen } from 'electron'
 import { join } from 'path'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
-import { startBackend } from '@desktop-claw/backend'
+import { startBackend, copyInitialTemplates } from '@desktop-claw/backend'
 
 let ballWin: BrowserWindow | null = null
 let panelWin: BrowserWindow | null = null
@@ -10,6 +10,15 @@ let backendHandle: { close: () => Promise<void>; sealDay: () => Promise<void> } 
 
 /** 拖拽时记录光标相对于窗口左上角的偏移量 */
 let dragOffset = { x: 0, y: 0 }
+
+/** 计算数据目录：dev 用项目内 data/，prod 用 Application Support */
+function resolveDataDir(): string {
+  if (app.isPackaged) {
+    return join(app.getPath('userData'), 'data')
+  }
+  // dev: 项目根目录 data/（__dirname = apps/desktop/out/main/）
+  return join(__dirname, '..', '..', '..', '..', 'data')
+}
 
 /** 悬浮球窗口尺寸（含气泡区域） */
 const BALL_WIN_W = 240
@@ -365,9 +374,7 @@ ipcMain.on('window:close', (event) => {
 // ── 配置管理 ──────────────────────────────────────────────
 
 function getConfigPath(): string {
-  if (app.isPackaged) return join(app.getPath('userData'), 'config.json')
-  // dev: 项目根目录 data/config.json（__dirname = apps/desktop/out/main/）
-  return join(__dirname, '..', '..', '..', '..', 'data', 'config.json')
+  return join(resolveDataDir(), 'config.json')
 }
 
 function readConfig(): Record<string, unknown> {
@@ -402,7 +409,15 @@ ipcMain.handle('config:set', (_event, config: Record<string, unknown>) => {
 // ── App 生命周期 ───────────────────────────────────────────
 app.whenReady().then(async () => {
   try {
-    backendHandle = await startBackend()
+    backendHandle = await startBackend({ dataDir: resolveDataDir() })
+
+    // 生产环境首次启动：复制初始模板
+    if (app.isPackaged) {
+      const builtinPersona = join(process.resourcesPath, 'persona')
+      if (existsSync(builtinPersona)) {
+        copyInitialTemplates(builtinPersona)
+      }
+    }
   } catch (err: unknown) {
     console.error('[main] Failed to start backend:', err)
   }

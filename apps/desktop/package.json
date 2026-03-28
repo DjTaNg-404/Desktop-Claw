@@ -7,7 +7,38 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
+    "package": "pnpm run build:skills && electron-vite build && electron-builder --mac",
+    "build:skills": "tsc -p ../../packages/backend/src/agent/skills/tsconfig.scripts.json && mkdir -p resources/skills/file/references && cp ../../packages/backend/src/agent/skills/file/SKILL.md resources/skills/file/ && cp ../../packages/backend/src/agent/skills/file/references/format-details.md resources/skills/file/references/ && cp ../../packages/backend/src/agent/skills/memory/SKILL.md resources/skills/memory/",
     "typecheck": "tsc -p ../../packages/backend/tsconfig.json --noEmit && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json"
+  },
+  "build": {
+    "appId": "com.djtang.desktop-claw",
+    "productName": "Desktop-Claw",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "out/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/persona",
+        "to": "persona"
+      },
+      {
+        "from": "resources/skills",
+        "to": "skills"
+      }
+    ],
+    "mac": {
+      "icon": "resources/icon.icns",
+      "target": ["dmg", "zip"],
+      "category": "public.app-category.productivity",
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "dmg": {
+      "title": "${productName} ${version}"
+    }
   },
   "dependencies": {
     "@desktop-claw/backend": "workspace:*",
@@ -22,6 +53,7 @@
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^4.3.0",
     "electron": "^34.0.0",
+    "electron-builder": "^26.8.1",
     "electron-vite": "^2.3.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",

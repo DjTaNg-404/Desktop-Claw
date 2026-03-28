@@ -21,20 +21,29 @@ export interface DayArchive {
 // ─── 路径解析 ────────────────────────────────
 
 /**
- * 从当前文件位置向上逐级查找 data/memory/ 目录
- * 兼容 src 和 dist 两种运行方式
+ * 解析 data/memory/ 目录
+ * 优先通过统一 paths.ts 获取；脚本独立运行时 fallback 到目录探测
  */
 export function resolveMemoryDir(): string {
-  let dir = __dirname
-  for (let i = 0; i < 10; i++) {
-    const candidate = join(dir, 'data', 'memory')
-    if (existsSync(candidate)) return candidate
-    const parent = resolve(dir, '..')
-    if (parent === dir) break
-    dir = parent
+  // 优先从环境变量获取（子进程由 skill-manager 注入 DATA_DIR）
+  if (process.env.DATA_DIR) {
+    return join(process.env.DATA_DIR, 'memory')
   }
-  // 最终兜底
-  return join(process.cwd(), 'data', 'memory')
+  try {
+    const { getMemoryDir } = require('../../../paths')
+    return getMemoryDir()
+  } catch {
+    // fallback: 脚本独立运行（子进程 CLI），向上逐级查找
+    let dir = __dirname
+    for (let i = 0; i < 10; i++) {
+      const candidate = join(dir, 'data', 'memory')
+      if (existsSync(candidate)) return candidate
+      const parent = resolve(dir, '..')
+      if (parent === dir) break
+      dir = parent
+    }
+    return join(process.cwd(), 'data', 'memory')
+  }
 }
 
 // ─── 归档读取 ────────────────────────────────

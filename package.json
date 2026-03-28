@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "pnpm --filter @desktop-claw/desktop run dev",
     "build": "pnpm --filter @desktop-claw/desktop run build",
+    "package": "pnpm --filter @desktop-claw/desktop run package",
     "typecheck": "pnpm -r run typecheck",
     "lint": "pnpm -r run lint"
   },

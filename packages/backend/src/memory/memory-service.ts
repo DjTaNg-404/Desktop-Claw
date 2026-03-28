@@ -4,6 +4,7 @@ import type { ChatMessageData } from '@desktop-claw/shared'
 import { streamChat } from '../llm/client'
 import { loadLLMConfig } from '../llm/config'
 import { estimateHistoryTokens } from '../llm/token-estimator'
+import { getMemoryDir, getPersonaDir } from '../paths'
 
 // ─── 类型定义 ────────────────────────────────
 
@@ -25,34 +26,13 @@ export interface DayArchive {
 // ─── data/ 目录路径解析 ──────────────────────
 
 function resolveMemoryDir(): string {
-  const candidates = [
-    join(__dirname, '..', '..', '..', '..', 'data', 'memory'),  // from out/main or src
-    join(__dirname, '..', '..', 'data', 'memory'),               // from packages/backend/src
-    join(process.cwd(), 'data', 'memory')                        // fallback
-  ]
-
-  for (const dir of candidates) {
-    if (existsSync(dir)) return dir
-  }
-
-  // 第一个候选不存在时创建
-  mkdirSync(candidates[0], { recursive: true })
-  return candidates[0]
+  const dir = getMemoryDir()
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+  return dir
 }
 
 function resolvePersonaDir(): string {
-  const candidates = [
-    join(__dirname, '..', '..', '..', '..', 'data', 'persona'),
-    join(__dirname, '..', '..', 'data', 'persona'),
-    join(process.cwd(), 'data', 'persona')
-  ]
-
-  for (const dir of candidates) {
-    if (existsSync(dir)) return dir
-  }
-
-  mkdirSync(candidates[0], { recursive: true })
-  return candidates[0]
+  return getPersonaDir()
 }
 
 // ─── 辅助函数 ────────────────────────────────

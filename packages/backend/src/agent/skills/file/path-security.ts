@@ -70,7 +70,7 @@ export function validatePath(
 }
 
 /**
- * 从 config 加载 allowedRoots，MVP 默认允许访问 ~/Desktop, ~/Documents, ~/Downloads 和项目 data/ 目录
+ * 从 config 加载 allowedRoots，MVP 默认允许访问 ~/Desktop, ~/Documents, ~/Downloads 和数据目录
  */
 export function getDefaultAllowedRoots(): string[] {
   const home = homedir()
@@ -80,17 +80,17 @@ export function getDefaultAllowedRoots(): string[] {
     resolve(home, 'Downloads'),
   ]
 
-  // 项目 data/ 目录：多候选路径（脚本 CLI 执行 vs electron-vite 打包后路径不同）
-  const dataCandidates = [
-    resolve(__dirname, '..', '..', '..', '..', '..', '..', 'data'),   // from skills/file/ (6 levels to project root)
-    resolve(__dirname, '..', '..', '..', '..', 'data'),               // from out/main/ (electron-vite bundled)
-    resolve(process.cwd(), 'data'),                                    // fallback: cwd-based
-  ]
-
-  for (const candidate of dataCandidates) {
-    if (existsSync(candidate)) {
-      roots.push(resolve(candidate))
-      break
+  // 数据目录：优先从环境变量获取（子进程由 skill-manager 注入 DATA_DIR）
+  if (process.env.DATA_DIR) {
+    roots.push(resolve(process.env.DATA_DIR))
+  } else {
+    try {
+      const { getDataDir } = require('../../../paths')
+      roots.push(resolve(getDataDir()))
+    } catch {
+      // fallback: 脚本独立运行时无法 import paths.ts
+      const fallback = resolve(process.cwd(), 'data')
+      if (existsSync(fallback)) roots.push(resolve(fallback))
     }
   }
 

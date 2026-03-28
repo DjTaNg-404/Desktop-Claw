@@ -6,7 +6,9 @@ node_modules/
 dist/
 out/
 build/
+release/
 *.tsbuildinfo
+apps/desktop/resources/skills/
 
 # ---- 本地数据（运行时生成）----
 data/
@@ -21,6 +23,7 @@ PLAN.md
 PRD.md
 DEVLOG.md
 ARCHITECTURE.md
+PACKAGING.md
 Hello-Claw学习笔记.md
 
 # ---- 参考代码（第三方，仅供本地参考）----

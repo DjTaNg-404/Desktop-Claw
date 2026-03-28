@@ -1,26 +1,7 @@
 import { readFileSync, statSync, existsSync } from 'fs'
 import { join } from 'path'
 import { homedir } from 'os'
-
-// ─── data/ 目录解析 ──────────────────────────
-
-/**
- * 解析 data/ 目录路径（与 llm/config.ts 保持一致的多路径 fallback）
- * electron-vite 打包后 __dirname 指向 out/main/，需要多路径候选
- */
-function resolveDataDir(): string {
-  const candidates = [
-    join(__dirname, '..', '..', '..', '..', 'data'),   // from out/main or src
-    join(__dirname, '..', '..', 'data'),                // from packages/backend/src
-    join(process.cwd(), 'data')                         // fallback
-  ]
-
-  for (const dir of candidates) {
-    if (existsSync(join(dir, 'persona'))) return dir
-  }
-  // 最后 fallback：即使 persona/ 不存在，也返回一个合理路径
-  return candidates[0]
-}
+import { getDataDir } from '../paths'
 
 // ─── 文件 stat 缓存 ─────────────────────────
 
@@ -125,7 +106,7 @@ export function assembleSystemPrompt(
   discoveryPrompt: string,
   activeSkillPrompt: string
 ): string {
-  const dataDir = resolveDataDir()
+  const dataDir = getDataDir()
   const personaDir = join(dataDir, 'persona')
 
   // 提前检测 BOOTSTRAP.md 是否存在（决定是否为引导模式）

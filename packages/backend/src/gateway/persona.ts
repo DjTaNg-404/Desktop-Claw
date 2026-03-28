@@ -2,21 +2,10 @@ import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import type { FastifyInstance } from 'fastify'
 import { greetingService } from '../memory/greeting-service'
-
-function resolveDataDir(): string {
-  const candidates = [
-    join(__dirname, '..', '..', '..', '..', 'data'),
-    join(__dirname, '..', '..', 'data'),
-    join(process.cwd(), 'data')
-  ]
-  for (const dir of candidates) {
-    if (existsSync(join(dir, 'persona'))) return dir
-  }
-  return candidates[0]
-}
+import { getPersonaDir } from '../paths'
 
 function readPersonaFile(filename: string): string | null {
-  const filePath = join(resolveDataDir(), 'persona', filename)
+  const filePath = join(getPersonaDir(), filename)
   if (!existsSync(filePath)) return null
   return readFileSync(filePath, 'utf-8')
 }

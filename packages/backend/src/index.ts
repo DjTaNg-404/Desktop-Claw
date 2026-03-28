@@ -4,13 +4,20 @@ import { setupCalendarRoutes } from './gateway/calendar'
 import { setupPersonaRoutes } from './gateway/persona'
 import { memoryService } from './memory/memory-service'
 import { greetingService } from './memory/greeting-service'
+import { initDataDir } from './paths'
+
+export { initDataDir } from './paths'
+export { copyInitialTemplates } from './paths'
 
 const DEFAULT_PORT = 3721
 
-export async function startBackend(port = DEFAULT_PORT): Promise<{
+export async function startBackend(options: { port?: number; dataDir?: string } = {}): Promise<{
   close: () => Promise<void>
   sealDay: () => Promise<void>
 }> {
+  const { port = DEFAULT_PORT, dataDir } = options
+  if (dataDir) initDataDir(dataDir)
+
   const app = Fastify({ logger: false })
 
   // CORS: 允许 Electron 渲染进程（dev server）跨域访问 HTTP 路由

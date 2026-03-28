@@ -10,7 +10,7 @@
 
 **当前阶段：** Milestone C 🔄 进行中  
 **最近更新：** 2026-03-28  
-**当前进度：** Milestone B 完成 + 记忆归档 Bug 修复 + Claw 角色面板 + LLM 互动语
+**当前进度：** C.4 数据路径适配 + C.1 Electron 打包 + C.2 App Icon + 生产环境 Skill 脚本修复
 
 ---
 
@@ -39,6 +39,108 @@
 ---
 
 ## 开发日志
+
+### 2026-03-28｜生产环境 Skill 脚本执行修复
+
+**问题发现：**
+
+用户安装打包后的 .dmg 测试 BOOTSTRAP 首次引导流程，Claw 尝试写入 USER.md 时触发 15s watchdog 超时，显示"⚠ 回复中断，请重试"。
+
+**根因分析（连锁故障）：**
+1. 打包后所有 TS 代码 bundle 进 `out/main/index.js`，原始 `.ts` 脚本文件不存在于磁盘
+2. `npx tsx` 是 devDependency，生产环境不可用
+3. `resolveSkillsDir()` 所有候选路径在生产环境均无效
+4. 脚本执行失败 → 无 token 发出 → 前端 15s watchdog 触发 → "回复中断"
+
+**修复内容：**
+
+1. **预编译脚本为 JS**（`tsconfig.scripts.json`）：
+   - 新增 `packages/backend/src/agent/skills/tsconfig.scripts.json`
+   - 将 6 个脚本 + 2 个依赖模块编译为 CommonJS `.js`，输出到 `apps/desktop/resources/skills/`
+   - `build:skills` 脚本自动编译 + 复制 SKILL.md 和 references 文档
+
+2. **环境变量传递数据路径**：
+   - `skill-manager.ts` 的 `runSkillScript()` 向子进程注入 `DATA_DIR` 和 `ELECTRON_RUN_AS_NODE=1` 环境变量
+   - `path-security.ts`、`memory-utils.ts` 优先从 `process.env.DATA_DIR` 获取数据目录
+
+3. **生产路径解析**：
+   - `resolveSkillsDir()` 新增 `process.resourcesPath/skills` 候选路径（最高优先级）
+
+4. **`process.execPath` 替代 `node`**：
+   - `getScriptInterpreter()` 对 `.js` 文件使用 `process.execPath`（Electron 自带 Node 运行时）
+   - 设置 `ELECTRON_RUN_AS_NODE=1` 使 Electron 以纯 Node.js 模式执行脚本
+
+5. **extraResources 打入**：
+   - `apps/desktop/package.json` 新增 `resources/skills → skills` 的 extraResources 配置
+
+**验证结果：**
+- backend + desktop typecheck 均 0 错误 ✅
+- `pnpm package` 打包成功，skills 目录正确打入 `.app/Contents/Resources/skills/` ✅
+
+---
+
+### 2026-03-28｜C.2 App 图标
+
+**完成内容：**
+
+- 用户通过 AI 工具（即梦）生成 1024×1024 橙色猫爪 3D 风格 PNG
+- 使用 `sips` + `iconutil` 生成 10 个尺寸的 macOS `.icns` 文件（16px → 1024px）
+- electron-builder 配置 `mac.icon: resources/icon.icns`
+- 打包后 "default Electron icon" 警告消失，自定义图标正常显示
+
+**涉及文件：**
+- 新增 `apps/desktop/resources/icon.png`、`apps/desktop/resources/icon.icns`
+
+---
+
+### 2026-03-28｜C.1 Electron 打包
+
+**完成内容：**
+
+- 安装 `electron-builder` 作为 devDependency
+- 配置 `apps/desktop/package.json` 的 `build` 字段：appId、productName、files、extraResources、mac target（dmg + zip）
+- 新增 `pnpm package` 脚本（根目录 + desktop 包）
+- 首次成功生成 `Desktop-Claw-0.0.1-arm64.dmg`（124 MB）+ `.zip`（119 MB）
+- 人格模板（SOUL.md、BOOTSTRAP.md）通过 extraResources 打入 `.app/Contents/Resources/persona/`
+
+**涉及文件：**
+- 修改 `apps/desktop/package.json`（build 配置、package 脚本）
+- 修改 `package.json`（根目录 package 脚本）
+- 新增 `apps/desktop/resources/persona/`（SOUL.md、BOOTSTRAP.md 副本）
+- `.gitignore` 新增 `release/`
+
+---
+
+### 2026-03-28｜C.4 数据路径适配（dev/prod 双模式）
+
+**完成内容：**
+
+- **新增 `packages/backend/src/paths.ts`**：统一数据目录路径管理模块
+  - `initDataDir(dir)` — 由 main 进程在启动 backend 时注入
+  - `getDataDir()`、`getPersonaDir()`、`getMemoryDir()`、`getConfigPath()`
+  - `copyInitialTemplates(builtinPersonaDir)` — 生产首次启动时复制初始模板
+  - `ensureDataStructure()` — 自动创建 persona/memory/db/files 子目录
+  - 未注入时 fallback 到开发模式路径探测
+
+- **改造 7 个 backend 模块**：全部从 `paths.ts` 统一获取路径，移除各模块自行探测逻辑
+  - `memory-service.ts`、`greeting-service.ts`、`persona.ts`、`prompt-assembler.ts`、`config.ts`、`path-security.ts`、`memory-utils.ts`
+
+- **改造 `apps/desktop/src/main/index.ts`**：
+  - `resolveDataDir()` 根据 `app.isPackaged` 判断 dev/prod
+  - 生产模式：`~/Library/Application Support/Desktop-Claw/data/`
+  - 开发模式：项目根目录 `data/`
+  - `startBackend({ dataDir })` 注入数据目录
+  - 生产首次启动自动从 `process.resourcesPath/persona` 复制模板
+
+**设计决策：**
+- 注入式（main → backend）而非检测式 — 路径来源唯一确定，不依赖 __dirname 猜测
+- 开发模式 fallback 保留 — backend 可脱离 Electron 独立运行和测试
+- 卸载 App 不删除数据 — Application Support 目录由系统管理
+
+**验证结果：**
+- backend + desktop typecheck 均 0 错误 ✅
+
+---
 
 ### 2026-03-28｜LLM 互动语预生成 + 启动开场语（C.8）
 

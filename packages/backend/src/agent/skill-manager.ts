@@ -3,6 +3,7 @@ import { readFileSync, existsSync } from 'fs'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
 import type { ToolSchema, ToolResult, ToolDefinition } from '@desktop-claw/shared'
+import { getDataDir } from '../paths'
 import {
   extractFrontmatter,
   formatDiscoveryPrompt,
@@ -33,16 +34,25 @@ const BUILTIN_SKILLS: BuiltinSkillConfig[] = [
 ]
 
 /**
- * 解析 skills 源码目录（SKILL.md 所在位置）
- * electron-vite 打包后 __dirname 指向 out/main/，需要多路径 fallback
+ * 解析 skills 目录
+ * - 生产模式：process.resourcesPath/skills（预编译 JS + SKILL.md）
+ * - 开发模式：源码 packages/backend/src/agent/skills/
  */
 function resolveSkillsDir(): string {
-  const candidates = [
+  const candidates: string[] = []
+
+  // 生产环境：extraResources 打入 skills/
+  const rp = (process as unknown as Record<string, unknown>).resourcesPath as string | undefined
+  if (rp) {
+    candidates.push(join(rp, 'skills'))
+  }
+
+  candidates.push(
     join(__dirname, 'skills'),
     join(process.cwd(), 'packages/backend/src/agent/skills'),
     // electron-vite dev: __dirname = apps/desktop/out/main/，向上 4 级回到 workspace root
     join(__dirname, '..', '..', '..', '..', 'packages/backend/src/agent/skills')
-  ]
+  )
   for (const dir of candidates) {
     if (existsSync(join(dir, 'file', 'SKILL.md'))) return dir
   }
@@ -340,7 +350,8 @@ export class SkillManager {
         return { cmd: 'python3', prefixArgs: [scriptPath] }
       case 'js':
       case 'mjs':
-        return { cmd: 'node', prefixArgs: [scriptPath] }
+        // 使用 process.execPath 确保在 Electron 打包环境中可用（自带 Node 运行时）
+        return { cmd: process.execPath, prefixArgs: [scriptPath] }
       case 'ts':
         return { cmd: 'npx', prefixArgs: ['tsx', scriptPath] }
       default:
@@ -387,7 +398,13 @@ export class SkillManager {
         cwd: skill.skillDir,
         timeout: 30_000,
         maxBuffer: 1024 * 1024,
-        env: { ...process.env, SKILL_DIR: skill.skillDir }
+        env: {
+          ...process.env,
+          SKILL_DIR: skill.skillDir,
+          DATA_DIR: getDataDir(),
+          // 让 Electron 打包后的 process.execPath 以纯 Node.js 模式运行脚本
+          ELECTRON_RUN_AS_NODE: '1'
+        }
       })
 
       // 尝试解析 stdout 为 JSON 结构化结果

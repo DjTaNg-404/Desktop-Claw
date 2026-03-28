@@ -1,20 +1,7 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { streamChat } from '../llm/client'
-
-/* ── 路径解析（与 prompt-assembler 同模式） ──────────── */
-
-function resolveDataDir(): string {
-  const candidates = [
-    join(__dirname, '..', '..', '..', '..', 'data'),
-    join(__dirname, '..', '..', 'data'),
-    join(process.cwd(), 'data')
-  ]
-  for (const dir of candidates) {
-    if (existsSync(join(dir, 'persona'))) return dir
-  }
-  return candidates[0]
-}
+import { getDataDir, getPersonaDir, getMemoryDir } from '../paths'
 
 /* ── 类型 ────────────────────────────────────────────── */
 
@@ -88,8 +75,7 @@ class GreetingService {
   }
 
   private _buildPrompt(): string {
-    const dataDir = resolveDataDir()
-    const personaDir = join(dataDir, 'persona')
+    const personaDir = getPersonaDir()
 
     const user = this._readFile(join(personaDir, 'USER.md'))
     const context = this._readFile(join(personaDir, 'CONTEXT.md'))
@@ -179,7 +165,7 @@ ${contextInfo ? `- 最近动态：\n${contextInfo}` : ''}
 
   private _readCache(): GreetingCache | null {
     try {
-      const cachePath = join(resolveDataDir(), 'memory', CACHE_FILE)
+      const cachePath = join(getMemoryDir(), CACHE_FILE)
       if (!existsSync(cachePath)) return null
       const data = JSON.parse(readFileSync(cachePath, 'utf-8'))
       if (data && typeof data.date === 'string' && Array.isArray(data.pool)) {
@@ -193,7 +179,7 @@ ${contextInfo ? `- 最近动态：\n${contextInfo}` : ''}
 
   private _saveCache(): void {
     try {
-      const cachePath = join(resolveDataDir(), 'memory', CACHE_FILE)
+      const cachePath = join(getMemoryDir(), CACHE_FILE)
       const cache: GreetingCache = { date: this._today(), pool: this.pool }
       writeFileSync(cachePath, JSON.stringify(cache, null, 2), 'utf-8')
     } catch (err) {
