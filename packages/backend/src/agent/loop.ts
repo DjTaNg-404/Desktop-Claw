@@ -4,23 +4,10 @@ import { loadLLMConfig } from '../llm/config'
 import { estimateTokens, estimateMessageTokens, estimateHistoryTokens } from '../llm/token-estimator'
 import { SkillManager } from './skill-manager'
 import { assembleSystemPrompt } from './prompt-assembler'
+import { trimHistory, trimToolResults } from './history-trimmer'
 
 /** Agent Loop 最大迭代回合数（防死循环） */
 const MAX_STEPS = 10
-
-/** context window 中历史消息允许占用的比例上限（90%）*/
-const HISTORY_BUDGET_RATIO = 0.9
-
-// ── tool_result 修剪参数 ──
-/** tool 消息 content 超过此长度时触发修剪 */
-const TOOL_TRIM_THRESHOLD = 800
-/** 修剪时保留的头部字符数 */
-const TOOL_TRIM_HEAD = 300
-/** 修剪时保留的尾部字符数 */
-const TOOL_TRIM_TAIL = 300
-
-/** 默认 context window（DeepSeek 128K 的 ~90%） */
-const DEFAULT_CONTEXT_WINDOW = 115000
 
 
 /** 全局 SkillManager 单例（首次调用时初始化） */
@@ -53,134 +40,6 @@ export interface AgentLoopParams {
 
 /** 摘要消息前缀（与 memory-service.ts SUMMARY_PREFIX 一致） */
 const SUMMARY_PREFIX = '[对话摘要]'
-
-/**
- * 获取当前模型的 context window 大小
- */
-function getContextWindow(): number {
-  return loadLLMConfig()?.contextWindow ?? DEFAULT_CONTEXT_WINDOW
-}
-
-/**
- * 修剪历史中的大 tool_result：超过阈值时只保留 head + tail，中间替换为省略标记。
- * 直接修改传入数组中的消息 content（浅拷贝替换），不影响磁盘归档。
- * 只处理 endIndex 之前的 tool 消息（当前轮次的 tool_result 不动）。
- */
-function trimToolResults(messages: ChatMessageData[], endIndex: number): void {
-  for (let i = 0; i < endIndex; i++) {
-    const m = messages[i]
-    if (m.role !== 'tool') continue
-    if (m.content.length <= TOOL_TRIM_THRESHOLD) continue
-
-    const omitted = m.content.length - TOOL_TRIM_HEAD - TOOL_TRIM_TAIL
-    const head = m.content.slice(0, TOOL_TRIM_HEAD)
-    const tail = m.content.slice(-TOOL_TRIM_TAIL)
-    // 浅拷贝替换，避免修改 conversation 数组中的原始引用
-    messages[i] = { ...m, content: `${head}\n\n... [已省略约 ${omitted} 字] ...\n\n${tail}` }
-  }
-}
-
-/**
- * 将消息序列切分为"原子组"：
- * - assistant(tool_calls) + 紧随的 tool(result)* → 一组（不可拆分）
- * - 普通的 user / assistant → 单条一组
- * - 头部摘要消息 → 单独一组（不可删除）
- *
- * 返回数组，每个元素是一组消息的 index 范围 [start, end)
- */
-function buildAtomicGroups(messages: ChatMessageData[]): { start: number; end: number; pinned: boolean }[] {
-  const groups: { start: number; end: number; pinned: boolean }[] = []
-  let i = 0
-
-  // 检查头部摘要
-  if (messages[0]?.role === 'assistant' && messages[0].content.startsWith(SUMMARY_PREFIX)) {
-    groups.push({ start: 0, end: 1, pinned: true })
-    i = 1
-  }
-
-  while (i < messages.length) {
-    const msg = messages[i]
-    // assistant 带 tool_calls → 它和后续所有 tool 消息为一组
-    if (msg.role === 'assistant' && msg.tool_calls && msg.tool_calls.length > 0) {
-      const groupStart = i
-      i++ // skip assistant
-      while (i < messages.length && messages[i].role === 'tool') {
-        i++
-      }
-      groups.push({ start: groupStart, end: i, pinned: false })
-    } else {
-      groups.push({ start: i, end: i + 1, pinned: false })
-      i++
-    }
-  }
-
-  return groups
-}
-
-/**
- * Token-aware 历史裁剪：
- *
- * 1. 先做 tool_result 软修剪（大内容截断为 head+tail）
- * 2. 估算 system prompt + 当前消息的 token 开销
- * 3. 剩余预算分配给历史消息
- * 4. 从最老的原子组开始丢弃，直到 token 总量在预算内
- * 5. 永远不拆分 assistant(tool_calls) + tool(result) 原子对
- * 6. 头部摘要消息（如有）始终保留
- */
-function trimHistory(
-  history: ChatMessageData[],
-  systemPromptTokens: number
-): ChatMessageData[] {
-  if (history.length === 0) return []
-
-  // 先做 tool_result 软修剪
-  const work = history.map((m) => ({ ...m }))
-  trimToolResults(work, work.length)
-
-  // 计算可用预算
-  const contextWindow = getContextWindow()
-  const totalBudget = Math.floor(contextWindow * HISTORY_BUDGET_RATIO)
-  const historyBudget = totalBudget - systemPromptTokens
-  if (historyBudget <= 0) return work // 极端情况：system prompt 就快满了
-
-  // 当前总 token 在预算内 → 不裁剪
-  const currentTokens = estimateHistoryTokens(work)
-  if (currentTokens <= historyBudget) return work
-
-  // 构建原子组
-  const groups = buildAtomicGroups(work)
-
-  // 计算每组的 token 数
-  const groupTokens = groups.map((g) => {
-    let t = 0
-    for (let i = g.start; i < g.end; i++) {
-      t += estimateMessageTokens(work[i])
-    }
-    return t
-  })
-
-  // 从最老的非 pinned 组开始删除，直到总量降到预算内
-  let totalTokens = currentTokens
-  const keepFlags = groups.map(() => true)
-
-  for (let g = 0; g < groups.length; g++) {
-    if (totalTokens <= historyBudget) break
-    if (groups[g].pinned) continue
-    keepFlags[g] = false
-    totalTokens -= groupTokens[g]
-  }
-
-  // 重组保留的消息
-  const result: ChatMessageData[] = []
-  for (let g = 0; g < groups.length; g++) {
-    if (!keepFlags[g]) continue
-    for (let i = groups[g].start; i < groups[g].end; i++) {
-      result.push(work[i])
-    }
-  }
-
-  return result
-}
 
 /**
  * Agent Loop（ReAct-like 执行循环）

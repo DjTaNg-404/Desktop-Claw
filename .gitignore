@@ -41,3 +41,6 @@ Thumbs.db
 *.log
 npm-debug.log*
 pnpm-debug.log*
+
+# ---- 测试文件（本地开发用，不提交）----
+**/*.test.ts

@@ -8,9 +8,9 @@
 
 ## 项目状态
 
-**当前阶段：** Milestone C 🔄 进行中  
+**当前阶段：** Milestone C ✅ 完成  
 **最近更新：** 2026-03-28  
-**当前进度：** C.4 + C.1 + C.2 + C.3 完成，生产环境 Skill 脚本修复
+**当前进度：** C.1~C.8 全部完成，Milestone C 收官
 
 ---
 
@@ -39,6 +39,31 @@
 ---
 
 ## 开发日志
+
+### 2026-03-28｜C.6 测试基线
+
+**目标：** 为核心纯函数引入 vitest 单元测试，建立最小覆盖基线。
+
+**实现：**
+- 安装 vitest@2（兼容 vite 5），根目录 `vitest.config.ts` + `pnpm test` 脚本
+- 从 `loop.ts` 提取 `trimToolResults`/`buildAtomicGroups`/`trimHistory` 到新模块 `history-trimmer.ts`，便于独立测试
+- 4 个测试文件 36 个用例：
+  - `path-security.test.ts` — 路径白名单、穿越攻击、敏感目录、符号链接逃逸
+  - `token-estimator.test.ts` — 中/英/混合 token 估算、消息开销、数组求和
+  - `history-trimmer.test.ts` — tool_result 裁剪、原子组构建、token 预算裁剪、pinned 摘要保护
+  - `memory-service.test.ts` — append/read 一致性、批量写入、日期排序、摘要结构
+- 测试文件加入 `.gitignore`（本地开发用，不提交远端）
+
+---
+
+### 2026-03-28｜C.5 体验修复
+
+**修复内容：**
+- WebSocket JSON.parse 失败时向客户端回送 `task.error`（原来只 console.error 无响应）
+- 删除空的 `apps/desktop/src/renderer/pages/` 占位目录
+- 另外 2 项（前端错误 UI、看门狗竞态）经排查已在既有代码中处理，无需改动
+
+---
 
 ### 2026-03-28｜生产环境 Skill 脚本执行修复
 

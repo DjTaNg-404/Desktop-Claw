@@ -9,11 +9,15 @@
     "dev": "pnpm --filter @desktop-claw/desktop run dev",
     "build": "pnpm --filter @desktop-claw/desktop run build",
     "package": "pnpm --filter @desktop-claw/desktop run package",
+    "test": "vitest run",
     "typecheck": "pnpm -r run typecheck",
     "lint": "pnpm -r run lint"
   },
   "engines": {
     "node": ">=20.0.0",
     "pnpm": ">=9.0.0"
+  },
+  "devDependencies": {
+    "vitest": "^2"
   }
 }
