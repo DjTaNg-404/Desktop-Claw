@@ -67,6 +67,13 @@ export async function setupWebSocket(app: FastifyInstance): Promise<void> {
         handleClientMessage(data)
       } catch {
         console.error('[ws] failed to parse message')
+        sendTo(socket, {
+          id: genMsgId(),
+          type: 'task.error',
+          taskId: '',
+          ts: new Date().toISOString(),
+          payload: { code: 'INVALID_MESSAGE', message: '消息格式无效，请重试' }
+        })
       }
     })
 
