@@ -1,18 +1,27 @@
-import { resolve, normalize, relative, isAbsolute } from 'path'
+import { resolve, normalize, relative, isAbsolute, sep } from 'path'
 import { realpathSync, existsSync } from 'fs'
 import { homedir } from 'os'
 
-/** 敏感路径前缀（绝对禁止访问） */
-const SENSITIVE_PREFIXES = [
-  resolve(homedir(), '.ssh'),
-  resolve(homedir(), '.gnupg'),
-  resolve(homedir(), '.aws'),
-  '/etc',
-  '/var',
-  '/usr',
-  '/System',
-  '/private'
-]
+/** 按平台返回敏感路径前缀（绝对禁止访问） */
+function getSensitivePrefixes(): string[] {
+  const home = homedir()
+  const common = [
+    resolve(home, '.ssh'),
+    resolve(home, '.gnupg'),
+    resolve(home, '.aws'),
+  ]
+  if (process.platform === 'win32') {
+    return [
+      ...common,
+      resolve('C:\\Windows'),
+      resolve('C:\\Program Files'),
+      resolve('C:\\Program Files (x86)'),
+    ]
+  }
+  return [...common, '/etc', '/var', '/usr', '/System', '/private']
+}
+
+const SENSITIVE_PREFIXES = getSensitivePrefixes()
 
 /**
  * 校验路径是否在允许的根目录内，阻止路径穿越和敏感路径访问。
@@ -30,7 +39,7 @@ export function validatePath(
 
   // 2. 检查敏感路径
   for (const prefix of SENSITIVE_PREFIXES) {
-    if (resolved.startsWith(prefix + '/') || resolved === prefix) {
+    if (resolved.startsWith(prefix + sep) || resolved === prefix) {
       return { valid: false, resolved, error: `禁止访问敏感路径: ${prefix}` }
     }
   }

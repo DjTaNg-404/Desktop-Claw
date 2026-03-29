@@ -4,11 +4,13 @@
   "private": true,
   "main": "out/main/index.js",
   "scripts": {
-    "dev": "electron-vite dev",
+    "dev": "pnpm run build:skills && electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "package": "pnpm run build:skills && electron-vite build && electron-builder --mac",
-    "build:skills": "tsc -p ../../packages/backend/src/agent/skills/tsconfig.scripts.json && mkdir -p resources/skills/file/references && cp ../../packages/backend/src/agent/skills/file/SKILL.md resources/skills/file/ && cp ../../packages/backend/src/agent/skills/file/references/format-details.md resources/skills/file/references/ && cp ../../packages/backend/src/agent/skills/memory/SKILL.md resources/skills/memory/",
+    "package:mac": "pnpm run build:skills && electron-vite build && electron-builder --mac",
+    "package:win": "pnpm run build:skills && electron-vite build && electron-builder --win",
+    "build:skills": "tsc -p ../../packages/backend/src/agent/skills/tsconfig.scripts.json && node ../../scripts/build-skills.mjs",
     "typecheck": "tsc -p ../../packages/backend/tsconfig.json --noEmit && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json"
   },
   "build": {
@@ -38,6 +40,18 @@
     },
     "dmg": {
       "title": "${productName} ${version}"
+    },
+    "win": {
+      "icon": "resources/icon.ico",
+      "target": ["nsis", "portable"],
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Desktop-Claw"
     }
   },
   "dependencies": {

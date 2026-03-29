@@ -47,10 +47,13 @@ function resolveSkillsDir(): string {
     candidates.push(join(rp, 'skills'))
   }
 
+  // 开发环境优先使用编译产物（.js），与生产一致
+  // electron-vite dev: __dirname = apps/desktop/out/main/
   candidates.push(
+    join(__dirname, '..', '..', 'resources', 'skills'),
     join(__dirname, 'skills'),
+    join(process.cwd(), 'apps/desktop/resources/skills'),
     join(process.cwd(), 'packages/backend/src/agent/skills'),
-    // electron-vite dev: __dirname = apps/desktop/out/main/，向上 4 级回到 workspace root
     join(__dirname, '..', '..', '..', '..', 'packages/backend/src/agent/skills')
   )
   for (const dir of candidates) {
@@ -345,9 +348,14 @@ export class SkillManager {
     switch (ext) {
       case 'sh':
       case 'bash':
-        return { cmd: '/bin/bash', prefixArgs: [scriptPath] }
+        return process.platform === 'win32'
+          ? { cmd: 'cmd.exe', prefixArgs: ['/c', scriptPath] }
+          : { cmd: '/bin/bash', prefixArgs: [scriptPath] }
       case 'py':
-        return { cmd: 'python3', prefixArgs: [scriptPath] }
+        return {
+          cmd: process.platform === 'win32' ? 'python' : 'python3',
+          prefixArgs: [scriptPath]
+        }
       case 'js':
       case 'mjs':
         // 使用 process.execPath 确保在 Electron 打包环境中可用（自带 Node 运行时）
@@ -378,7 +386,16 @@ export class SkillManager {
       return { success: false, content: '', error: `技能 "${skillName}" 未找到或未激活` }
     }
 
-    if (!skill.scripts.includes(scriptName)) {
+    // 支持 .ts → .js 自动降级：LLM 可能请求 write_file.ts，但编译后只有 .js
+    let resolvedScriptName = scriptName
+    if (!skill.scripts.includes(scriptName) && scriptName.endsWith('.ts')) {
+      const jsFallback = scriptName.replace(/\.ts$/, '.js')
+      if (skill.scripts.includes(jsFallback)) {
+        resolvedScriptName = jsFallback
+      }
+    }
+
+    if (!skill.scripts.includes(resolvedScriptName)) {
       return {
         success: false,
         content: '',
@@ -386,7 +403,7 @@ export class SkillManager {
       }
     }
 
-    const scriptPath = join(skill.skillDir, 'scripts', scriptName)
+    const scriptPath = join(skill.skillDir, 'scripts', resolvedScriptName)
     const argsStr = (args.args as string) || '{}'
     console.log(`[skill-manager] run_skill_script: ${scriptPath}`)
 
