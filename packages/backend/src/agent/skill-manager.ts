@@ -47,10 +47,13 @@ function resolveSkillsDir(): string {
     candidates.push(join(rp, 'skills'))
   }
 
+  // 开发环境优先使用编译产物（.js），与生产一致
+  // electron-vite dev: __dirname = apps/desktop/out/main/
   candidates.push(
+    join(__dirname, '..', '..', 'resources', 'skills'),
     join(__dirname, 'skills'),
+    join(process.cwd(), 'apps/desktop/resources/skills'),
     join(process.cwd(), 'packages/backend/src/agent/skills'),
-    // electron-vite dev: __dirname = apps/desktop/out/main/，向上 4 级回到 workspace root
     join(__dirname, '..', '..', '..', '..', 'packages/backend/src/agent/skills')
   )
   for (const dir of candidates) {
