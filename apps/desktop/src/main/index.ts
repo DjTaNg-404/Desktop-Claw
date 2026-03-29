@@ -440,12 +440,12 @@ app.whenReady().then(async () => {
   try {
     backendHandle = await startBackend({ dataDir: resolveDataDir() })
 
-    // 生产环境首次启动：复制初始模板
-    if (app.isPackaged) {
-      const builtinPersona = join(process.resourcesPath, 'persona')
-      if (existsSync(builtinPersona)) {
-        copyInitialTemplates(builtinPersona)
-      }
+    // 首次启动：复制初始模板（生产 → extraResources，开发 → resources/persona）
+    const builtinPersona = app.isPackaged
+      ? join(process.resourcesPath, 'persona')
+      : join(__dirname, '..', '..', 'resources', 'persona')
+    if (existsSync(builtinPersona)) {
+      copyInitialTemplates(builtinPersona)
     }
   } catch (err: unknown) {
     console.error('[main] Failed to start backend:', err)
