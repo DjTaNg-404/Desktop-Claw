@@ -8,7 +8,7 @@
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/status-Milestone%20C%20Done-brightgreen.svg)]()
-[![Platform](https://img.shields.io/badge/platform-macOS-lightgrey.svg)]()
+[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey.svg)]()
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6.svg)](https://www.typescriptlang.org/)
 [![Electron](https://img.shields.io/badge/Electron-latest-47848f.svg)](https://www.electronjs.org/)
 
@@ -48,6 +48,7 @@ Desktop-Claw 想探索另一种方式：
 
 ## 特性
 
+- **跨平台** — 支持 macOS 和 Windows，GitHub Actions 自动构建双平台安装包
 - **常驻桌面** — 悬浮球形态，不占用 Dock 和任务栏，始终在视野边缘待命
 - **实时流式响应** — 回答边生成边显示，不等待
 - **稳定人格** — 由 SOUL.md 定义角色性格，不漂移、不走样，重启后还是同一个 Claw
@@ -99,17 +100,28 @@ Memory Service (按天 JSON 归档 + 每日内化)
 
 ### 直接下载（推荐）
 
-前往 [Releases](https://github.com/DjTaNg-404/Desktop-Claw/releases/latest) 下载最新 `.dmg` 安装包。
+前往 [Releases](https://github.com/DjTaNg-404/Desktop-Claw/releases/latest) 下载对应平台的安装包：
 
-1. 双击 `.dmg`，拖入 Applications
+| 平台 | 文件 | 说明 |
+|------|------|------|
+| macOS (Apple Silicon) | `.dmg` | 双击打开，拖入 Applications |
+| macOS (Apple Silicon) | `.zip` | 解压即用 |
+| Windows (x64) | `.exe` | Portable 免安装版，双击直接运行 |
+
+**macOS 安装：**
+1. 下载 `.dmg` 文件，双击打开，拖入 Applications
 2. 首次打开需在「系统设置 → 隐私与安全性」中点"仍要打开"（未签名应用）
 3. 右键悬浮球 → 设置，填写 LLM API Key
 
-> 当前仅支持 macOS Apple Silicon (arm64)，需要一个支持 Function Calling 的 LLM API Key（推荐 DeepSeek）。
+**Windows 安装：**
+1. 下载 `.exe` 文件，双击直接运行（免安装）
+2. 右键悬浮球 → 设置，填写 LLM API Key
+
+> 需要一个支持 Function Calling 的 LLM API Key（推荐 DeepSeek）。
 
 ### 从源码构建
 
-前置要求：Node.js 20+ / pnpm 9+ / macOS 13+
+前置要求：Node.js 20+ / pnpm 9+
 
 ```bash
 # 克隆仓库
@@ -128,13 +140,18 @@ pnpm dev
 ### 打包分发
 
 ```bash
-# 构建 + 打包为 .dmg / .zip（macOS）
-pnpm package
+# macOS
+pnpm run package:mac
+
+# Windows
+pnpm run package:win
 ```
 
-产物位于 `apps/desktop/release/`，当前包体积约 124 MB。
+产物位于 `apps/desktop/release/`。推送 `v*` tag 时 GitHub Actions 会自动构建双平台并发布到 Release。
 
-安装后数据存储在 `~/Library/Application Support/Desktop-Claw/data/`，与开发环境隔离。
+安装后数据存储位置：
+- macOS: `~/Library/Application Support/Desktop-Claw/data/`
+- Windows: `%APPDATA%/Desktop-Claw/data/`
 
 ---
 
