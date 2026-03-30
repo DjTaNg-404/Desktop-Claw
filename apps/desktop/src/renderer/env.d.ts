@@ -20,6 +20,12 @@ declare global {
       showContextMenu: () => void
       /** 关闭当前窗口 */
       closeWindow: () => void
+      /** 本地后端运行时配置 */
+      getBackendRuntimeConfig: () => Promise<{
+        httpBaseURL: string
+        wsBaseURL: string
+        authToken: string
+      }>
       /** 读取配置 */
       getConfig: () => Promise<Record<string, unknown>>
       /** 写入配置 */

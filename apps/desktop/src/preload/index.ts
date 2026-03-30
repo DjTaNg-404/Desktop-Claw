@@ -22,6 +22,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   showContextMenu: (): void => { ipcRenderer.send('contextmenu:show') },
   /** 关闭当前窗口 */
   closeWindow: (): void => { ipcRenderer.send('window:close') },
+  /** 本地后端运行时配置 */
+  getBackendRuntimeConfig: (): Promise<{
+    httpBaseURL: string
+    wsBaseURL: string
+    authToken: string
+  }> => ipcRenderer.invoke('backend:get-runtime-config'),
   /** 读取配置 */
   getConfig: (): Promise<Record<string, unknown>> => ipcRenderer.invoke('config:get'),
   /** 写入配置 */

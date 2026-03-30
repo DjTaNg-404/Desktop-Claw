@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
+import { backendFetch } from '../../lib/backend-client'
 import './styles.css'
-
-const API_BASE = 'http://127.0.0.1:3721'
 
 /** SOUL.md 中允许展示的章节 */
 const SOUL_VISIBLE_SECTIONS = ['我是谁', '性格基调', '与用户的关系']
@@ -154,7 +153,7 @@ export function ClawProfile(): React.JSX.Element {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch(`${API_BASE}/persona`)
+    backendFetch('/persona')
       .then((r) => r.json())
       .then((d: PersonaData) => setData(d))
       .catch((err) => console.error('[profile] failed to fetch persona:', err))

@@ -1,17 +1,18 @@
 {
   "name": "@desktop-claw/desktop",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "main": "out/main/index.js",
   "scripts": {
-    "dev": "pnpm run build:skills && electron-vite dev",
-    "build": "electron-vite build",
+    "dev": "pnpm run build:backend && pnpm run build:skills && electron-vite dev",
+    "build": "pnpm run build:backend && electron-vite build",
     "preview": "electron-vite preview",
-    "package": "pnpm run build:skills && electron-vite build && electron-builder --mac",
-    "package:mac": "pnpm run build:skills && electron-vite build && electron-builder --mac",
-    "package:win": "pnpm run build:skills && electron-vite build && electron-builder --win",
+    "package": "pnpm run build:backend && pnpm run build:skills && electron-vite build && electron-builder --mac",
+    "package:mac": "pnpm run build:backend && pnpm run build:skills && electron-vite build && electron-builder --mac",
+    "package:win": "pnpm run build:backend && pnpm run build:skills && electron-vite build && electron-builder --win",
+    "build:backend": "pnpm --filter @desktop-claw/backend run build",
     "build:skills": "tsc -p ../../packages/backend/src/agent/skills/tsconfig.scripts.json && node ../../scripts/build-skills.mjs",
-    "typecheck": "tsc -p ../../packages/backend/tsconfig.json --noEmit && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json"
+    "typecheck": "pnpm run build:backend && tsc -p ../../packages/backend/tsconfig.json --noEmit && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json"
   },
   "build": {
     "appId": "com.djtang.desktop-claw",

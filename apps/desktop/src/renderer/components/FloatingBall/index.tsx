@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { ChatBubble } from '../ChatBubble'
 import { QuickInput } from '../QuickInput'
 import { useClawSocket } from '../../hooks/useClawSocket'
+import { backendFetch } from '../../lib/backend-client'
 import './styles.css'
 
 const GREETINGS = [
@@ -174,7 +175,7 @@ export function FloatingBall(): React.JSX.Element {
 
   const handleSingleClick = useCallback(() => {
     // 先尝试从 LLM 预生成池取，失败则 fallback 到固定模板
-    fetch('http://127.0.0.1:3721/greeting')
+    backendFetch('/greeting')
       .then((r) => r.json())
       .then((data: { greeting: string | null }) => {
         const text = data.greeting ?? GREETINGS[Math.floor(Math.random() * GREETINGS.length)]

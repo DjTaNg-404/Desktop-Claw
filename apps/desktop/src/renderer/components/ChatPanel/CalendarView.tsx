@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-
-const API_BASE = 'http://127.0.0.1:3721'
+import { backendFetch } from '../../lib/backend-client'
 const WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日']
 
 interface CalendarViewProps {
@@ -14,7 +13,7 @@ export function CalendarView({ onSelectDate }: CalendarViewProps): React.JSX.Ele
   const [availableDates, setAvailableDates] = useState<Set<string>>(new Set())
 
   useEffect(() => {
-    fetch(`${API_BASE}/calendar/dates`)
+    backendFetch('/calendar/dates')
       .then((r) => r.json())
       .then((data: { dates: string[] }) => setAvailableDates(new Set(data.dates)))
       .catch((err) => console.error('[calendar] failed to fetch dates:', err))

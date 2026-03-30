@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, Menu, screen } from 'electron'
+import { randomBytes } from 'crypto'
 import { join } from 'path'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { startBackend, copyInitialTemplates } from '@desktop-claw/backend'
@@ -7,6 +8,8 @@ let ballWin: BrowserWindow | null = null
 let panelWin: BrowserWindow | null = null
 let settingsWin: BrowserWindow | null = null
 let backendHandle: { close: () => Promise<void>; sealDay: () => Promise<void> } | null = null
+const BACKEND_PORT = 3721
+const BACKEND_AUTH_TOKEN = randomBytes(32).toString('hex')
 
 /** 拖拽时记录光标相对于窗口左上角的偏移量 */
 let dragOffset = { x: 0, y: 0 }
@@ -18,6 +21,21 @@ function resolveDataDir(): string {
   }
   // dev: 项目根目录 data/（__dirname = apps/desktop/out/main/）
   return join(__dirname, '..', '..', '..', '..', 'data')
+}
+
+function resolveAllowedOrigins(): string[] {
+  const allowed = new Set<string>(['null', 'file://'])
+  const rendererURL = process.env['ELECTRON_RENDERER_URL']
+
+  if (rendererURL) {
+    try {
+      allowed.add(new URL(rendererURL).origin)
+    } catch {
+      console.warn('[main] invalid ELECTRON_RENDERER_URL, skip origin allowlist')
+    }
+  }
+
+  return Array.from(allowed)
 }
 
 /** 悬浮球窗口尺寸（含气泡区域） */
@@ -128,6 +146,14 @@ ipcMain.on('set-ignore-mouse-events', (_event, ignore: boolean) => {
 ipcMain.handle('ipc:ping', () => {
   console.log('[main] received ping from renderer')
   return 'pong from main 🐾'
+})
+
+ipcMain.handle('backend:get-runtime-config', () => {
+  return {
+    httpBaseURL: `http://127.0.0.1:${BACKEND_PORT}`,
+    wsBaseURL: `ws://127.0.0.1:${BACKEND_PORT}`,
+    authToken: BACKEND_AUTH_TOKEN
+  }
 })
 
 // ── IPC: QuickInput 条形输入框 ─────────────────────────────
@@ -438,7 +464,12 @@ ipcMain.handle('config:set', (_event, config: Record<string, unknown>) => {
 // ── App 生命周期 ───────────────────────────────────────────
 app.whenReady().then(async () => {
   try {
-    backendHandle = await startBackend({ dataDir: resolveDataDir() })
+    backendHandle = await startBackend({
+      port: BACKEND_PORT,
+      dataDir: resolveDataDir(),
+      authToken: BACKEND_AUTH_TOKEN,
+      allowedOrigins: resolveAllowedOrigins()
+    })
 
     // 首次启动：复制初始模板（生产 → extraResources，开发 → resources/persona）
     const builtinPersona = app.isPackaged

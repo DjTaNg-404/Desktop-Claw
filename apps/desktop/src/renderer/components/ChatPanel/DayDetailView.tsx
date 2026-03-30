@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react'
-
-const API_BASE = 'http://127.0.0.1:3721'
+import { backendFetch } from '../../lib/backend-client'
 
 interface DaySummary {
   diary: string | null
@@ -28,8 +27,8 @@ export function DayDetailView({ date, onBack }: DayDetailViewProps): React.JSX.E
   useEffect(() => {
     setLoading(true)
     Promise.all([
-      fetch(`${API_BASE}/calendar/${date}`).then((r) => (r.ok ? r.json() : null)),
-      fetch(`${API_BASE}/calendar/${date}/messages`).then((r) => (r.ok ? r.json() : null))
+      backendFetch(`/calendar/${date}`).then((r) => (r.ok ? r.json() : null)),
+      backendFetch(`/calendar/${date}/messages`).then((r) => (r.ok ? r.json() : null))
     ])
       .then(([sum, msg]) => {
         if (sum) setSummaryData(sum)

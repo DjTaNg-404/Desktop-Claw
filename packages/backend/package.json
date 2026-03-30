@@ -1,9 +1,10 @@
 {
   "name": "@desktop-claw/backend",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "type": "commonjs",
   "main": "dist/index.js",
+  "types": "src/index.ts",
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",

@@ -4,6 +4,12 @@ import type { WebSocket } from 'ws'
 import type { ChatMessageData } from '@desktop-claw/shared'
 import { TaskCoordinator } from '../task-coordinator'
 import { memoryService } from '../memory/memory-service'
+import {
+  getRequestToken,
+  isAllowedOrigin,
+  isAuthorizedToken,
+  type BackendAccessConfig
+} from '../security/request-auth'
 
 /** 内存会话记录 — 启动时从当日 JSON 恢复 */
 const conversation: ChatMessageData[] = memoryService.getTodayMessages()
@@ -45,10 +51,24 @@ function broadcast(envelope: object): void {
 /**
  * 注册 Fastify WebSocket 插件并设置 /ws 路由
  */
-export async function setupWebSocket(app: FastifyInstance): Promise<void> {
+export async function setupWebSocket(
+  app: FastifyInstance,
+  accessConfig: BackendAccessConfig
+): Promise<void> {
   await app.register(websocket)
 
-  app.get('/ws', { websocket: true }, (socket) => {
+  app.get('/ws', { websocket: true }, (socket, request) => {
+    const origin = request.headers.origin
+    const token = getRequestToken(request.headers.authorization, request.raw.url)
+    const originAllowed = isAllowedOrigin(origin, accessConfig.allowedOrigins)
+    const tokenAuthorized = isAuthorizedToken(token, accessConfig.authToken)
+
+    if (!originAllowed || !tokenAuthorized) {
+      console.warn('[ws] rejected unauthorized websocket connection')
+      socket.close(1008, 'Unauthorized')
+      return
+    }
+
     clients.add(socket)
     console.log(`[ws] client connected (total: ${clients.size})`)
 
@@ -90,19 +110,6 @@ function handleClientMessage(
   switch (msg.type) {
     case 'task.create': {
       const content = (msg.payload?.content as string) ?? ''
-
-      // 记录用户消息
-      conversation.push({ role: 'user', content })
-      memoryService.appendMessage({ role: 'user', content })
-
-      // 广播 ack（附带 content 以便其他窗口同步用户消息）
-      broadcast({
-        id: genMsgId(),
-        type: 'task.ack',
-        taskId: msg.taskId,
-        ts: new Date().toISOString(),
-        payload: { content }
-      })
 
       // 入队 Task Coordinator（串行执行）
       const accepted = coordinator.enqueue(msg.taskId, content, {
@@ -161,7 +168,21 @@ function handleClientMessage(
           ts: new Date().toISOString(),
           payload: { code: 'QUEUE_FULL', message: '任务队列已满，请稍后再试' }
         })
+        break
       }
+
+      // 只有任务真正被接受后，才将用户消息写入内存与磁盘。
+      conversation.push({ role: 'user', content })
+      memoryService.appendMessage({ role: 'user', content })
+
+      // 广播 ack（附带 content 以便其他窗口同步用户消息）
+      broadcast({
+        id: genMsgId(),
+        type: 'task.ack',
+        taskId: msg.taskId,
+        ts: new Date().toISOString(),
+        payload: { content }
+      })
       break
     }
     case 'task.cancel': {

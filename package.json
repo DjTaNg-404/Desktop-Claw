@@ -1,6 +1,6 @@
 {
   "name": "desktop-claw",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "description": "A lightweight desktop AI companion living as a floating ball on your screen. Supports macOS & Windows.",
   "license": "MIT",

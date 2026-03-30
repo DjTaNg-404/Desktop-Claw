@@ -208,15 +208,15 @@ export class MemoryService {
 
   /** 返回最近 N 天的摘要（B.3 用） */
   getRecentSummaries(n: number): DayArchive[] {
-    const results: DayArchive[] = []
-    const today = new Date()
+    if (n <= 0) return []
 
-    for (let i = 1; i <= n + 30; i++) {
+    const results: DayArchive[] = []
+    const today = todayDateStr()
+
+    for (const date of this.getAvailableDates()) {
       if (results.length >= n) break
-      const d = new Date(today)
-      d.setDate(d.getDate() - i)
-      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-      const archive = readArchive(dateStr)
+      if (date === today) continue
+      const archive = readArchive(date)
       if (archive && archive.sealed) {
         results.push(archive)
       }
@@ -439,9 +439,75 @@ ${transcript}
 
   // ── 启动 ──
 
+  private _shouldFinalizeArchive(archive: DayArchive): boolean {
+    return archive.messages.filter((m) => m.role === 'user').length >= 2
+  }
+
+  private _hasArchiveOutputs(archive: DayArchive | null): boolean {
+    return !!(archive?.summary || archive?.diary)
+  }
+
+  private async _completeArchive(
+    date: string,
+    options: { finalizeTimeoutMs?: number; internalizeTimeoutMs?: number } = {}
+  ): Promise<boolean> {
+    const archive = readArchive(date)
+    if (!archive) return false
+    if (archive.sealed) return true
+
+    const shouldFinalize = this._shouldFinalizeArchive(archive)
+    if (!shouldFinalize) {
+      archive.sealed = true
+      writeArchive(archive)
+      console.log(`[memory] sealed low-activity archive for ${date} (too few user messages)`)
+      return true
+    }
+
+    let finalized = false
+
+    try {
+      const finalizePromise = this.finalizeDayArchive(date)
+      if (options.finalizeTimeoutMs) {
+        await this._withTimeout(finalizePromise, options.finalizeTimeoutMs, 'finalize')
+      } else {
+        await finalizePromise
+      }
+
+      finalized = this._hasArchiveOutputs(readArchive(date))
+    } catch (err) {
+      console.error(`[memory] finalize failed for ${date}:`, err)
+    }
+
+    if (!finalized) {
+      console.warn(`[memory] archive ${date} incomplete after finalize — will retry later`)
+      return false
+    }
+
+    try {
+      const internalizePromise = this.internalize(date)
+      if (options.internalizeTimeoutMs) {
+        await this._withTimeout(internalizePromise, options.internalizeTimeoutMs, 'internalize')
+      } else {
+        await internalizePromise
+      }
+    } catch (err) {
+      console.error(`[memory] internalize failed for ${date}:`, err)
+    }
+
+    const updated = readArchive(date)
+    if (!updated) return false
+    if (!updated.sealed) {
+      updated.sealed = true
+      writeArchive(updated)
+      console.log(`[memory] sealed archive for ${date}`)
+    }
+
+    return true
+  }
+
   /**
    * BOOT 行为：每次 App 启动时执行的轻量逻辑。
-   * 1. 扫描所有未 sealed 的历史归档（跳过今天）→ 补做 finalize + internalize + seal
+   * 1. 扫描所有未 sealed 的历史归档（跳过今天）→ 按统一规则补全并封存
    * 2. 读取昨日 diary，供未来注入首条对话上下文
    */
   async boot(): Promise<BootResult> {
@@ -472,21 +538,10 @@ ${transcript}
       if (!archive || archive.sealed) continue
 
       console.log(`[boot] recovering unsealed archive: ${date}`)
-      const userMsgCount = archive.messages.filter((m) => m.role === 'user').length
-      if (userMsgCount >= 2) {
-        try {
-          await this.finalizeDayArchive(date)
-          await this.internalize(date)
-        } catch (err) {
-          console.error(`[boot] recovery failed for ${date}:`, err)
-        }
-      }
-      // 无论 finalize 是否成功，都标记 sealed（防止反复重试死循环）
-      const updated = readArchive(date)
-      if (updated && !updated.sealed) {
-        updated.sealed = true
-        writeArchive(updated)
-        console.log(`[boot] sealed recovered archive for ${date}`)
+      try {
+        await this._completeArchive(date)
+      } catch (err) {
+        console.error(`[boot] recovery failed for ${date}:`, err)
       }
       result.recoveredYesterday = true
     }
@@ -550,9 +605,9 @@ ${transcript}
   }
 
   /**
-   * 关机归档：finalize（摘要/日记） → internalize（内化） → 条件 seal（封存）。
-   * finalize 成功才 seal；失败则不 seal，留给下次 boot() 重试。
-   * 每步独立 20s 超时，防止卡死。
+   * 关机归档：沿用统一归档完成规则。
+   * 有足够对话时尝试 finalize + internalize；内容过少则直接 seal；
+   * finalize 失败则不 seal，留给下次 boot() 重试。
    */
   async sealDay(): Promise<void> {
     const date = todayDateStr()
@@ -560,38 +615,10 @@ ${transcript}
     if (!archive) return
     if (archive.sealed) return
 
-    let finalized = false
-
-    // 1. 生成 summary / facts / diary（20s 超时）
-    try {
-      await this._withTimeout(this.finalizeDayArchive(date), 20000, 'finalize')
-      // 检查是否实际生成了内容
-      const check = readArchive(date)
-      finalized = !!(check?.summary || check?.diary)
-    } catch (err) {
-      console.error(`[memory] sealDay finalize failed:`, err)
-    }
-
-    // 2. 内化到 CONTEXT.md / USER.md（仅在 finalize 成功后，20s 超时）
-    if (finalized) {
-      try {
-        await this._withTimeout(this.internalize(date), 20000, 'internalize')
-      } catch (err) {
-        console.error(`[memory] sealDay internalize failed:`, err)
-      }
-    }
-
-    // 3. 只有 finalize 成功时才 seal，否则留给 boot() 下次重试
-    if (finalized) {
-      const updated = readArchive(date)
-      if (updated && !updated.sealed) {
-        updated.sealed = true
-        writeArchive(updated)
-        console.log(`[memory] sealed archive for ${date}`)
-      }
-    } else {
-      console.warn(`[memory] sealDay: finalize incomplete for ${date} — will retry on next boot`)
-    }
+    await this._completeArchive(date, {
+      finalizeTimeoutMs: 20000,
+      internalizeTimeoutMs: 20000
+    })
   }
 }
 

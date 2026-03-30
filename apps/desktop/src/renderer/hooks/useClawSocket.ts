@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-
-const WS_URL = 'ws://127.0.0.1:3721/ws'
+import { getBackendWebSocketURL } from '../lib/backend-client'
 
 /** 指数退避重连参数 */
 const RECONNECT_BASE_MS = 1000
@@ -47,6 +46,7 @@ export function useClawSocket(): {
   const [statusText, setStatusText] = useState('')
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const connectAttempt = useRef(0)
   /** 当前退避延迟（ms），每次重连失败翻倍，成功后重置 */
   const reconnectDelay = useRef(RECONNECT_BASE_MS)
   /** 记录本客户端发起的 taskId，用于 ack 时去重用户消息 */
@@ -117,8 +117,7 @@ export function useClawSocket(): {
 
       case 'task.ack': {
         const content = envelope.payload.content as string | undefined
-        // 如果是其他窗口发起的任务，补充用户消息
-        if (!sentTaskIds.current.has(envelope.taskId) && content !== undefined) {
+        if (content !== undefined) {
           setMessages((prev) => [...prev, { id: nextMsgId(), role: 'user', content }])
         }
         // 添加"正在思考"的 AI 占位消息
@@ -186,6 +185,8 @@ export function useClawSocket(): {
               content: `⚠️ ${message}`,
               streaming: false
             }
+          } else {
+            updated.push({ id: nextMsgId(), role: 'assistant', content: `⚠️ ${message}` })
           }
           return updated
         })
@@ -212,50 +213,69 @@ export function useClawSocket(): {
   }, [resetWatchdog, clearWatchdog])
 
   const connect = useCallback(() => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) return
+    if (
+      wsRef.current &&
+      (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)
+    ) return
 
     setConnectionState('connecting')
-    const ws = new WebSocket(WS_URL)
-    wsRef.current = ws
+    const attemptId = ++connectAttempt.current
 
-    ws.onopen = (): void => {
-      console.log('[ws] connected')
-      setConnectionState('connected')
-      // 连接成功，重置退避延迟
-      reconnectDelay.current = RECONNECT_BASE_MS
-    }
+    void getBackendWebSocketURL()
+      .then((wsURL) => {
+        if (attemptId !== connectAttempt.current) return
+        if (
+          wsRef.current &&
+          (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)
+        ) return
 
-    ws.onmessage = (event: MessageEvent): void => {
-      try {
-        const envelope: WsEnvelope = JSON.parse(event.data as string)
-        handleEnvelope(envelope)
-      } catch {
-        console.error('[ws] failed to parse message')
-      }
-    }
+        const ws = new WebSocket(wsURL)
+        wsRef.current = ws
 
-    ws.onclose = (): void => {
-      console.log('[ws] disconnected')
-      setConnectionState('disconnected')
-      // 只有当前活跃连接断线才重连；cleanup 关闭的旧连接不触发重连
-      if (wsRef.current === ws) {
-        wsRef.current = null
+        ws.onopen = (): void => {
+          console.log('[ws] connected')
+          setConnectionState('connected')
+          reconnectDelay.current = RECONNECT_BASE_MS
+        }
+
+        ws.onmessage = (event: MessageEvent): void => {
+          try {
+            const envelope: WsEnvelope = JSON.parse(event.data as string)
+            handleEnvelope(envelope)
+          } catch {
+            console.error('[ws] failed to parse message')
+          }
+        }
+
+        ws.onclose = (): void => {
+          console.log('[ws] disconnected')
+          setConnectionState('disconnected')
+          if (wsRef.current === ws) {
+            wsRef.current = null
+            const delay = reconnectDelay.current
+            console.log(`[ws] reconnecting in ${delay}ms`)
+            reconnectTimer.current = setTimeout(connect, delay)
+            reconnectDelay.current = Math.min(delay * 2, RECONNECT_MAX_MS)
+          }
+        }
+
+        ws.onerror = (): void => {
+          // onclose 会紧随触发，在那里处理重连
+        }
+      })
+      .catch((err) => {
+        console.error('[ws] failed to resolve runtime config:', err)
+        setConnectionState('disconnected')
         const delay = reconnectDelay.current
-        console.log(`[ws] reconnecting in ${delay}ms`)
         reconnectTimer.current = setTimeout(connect, delay)
-        // 指数退避：翻倍，不超过上限
         reconnectDelay.current = Math.min(delay * 2, RECONNECT_MAX_MS)
-      }
-    }
-
-    ws.onerror = (): void => {
-      // onclose 会紧随触发，在那里处理重连
-    }
+      })
   }, [handleEnvelope])
 
   useEffect(() => {
     connect()
     return () => {
+      connectAttempt.current += 1
       if (reconnectTimer.current) {
         clearTimeout(reconnectTimer.current)
         reconnectTimer.current = null
@@ -275,9 +295,6 @@ export function useClawSocket(): {
 
     const taskId = genTaskId()
     sentTaskIds.current.add(taskId)
-
-    // 乐观更新：立即显示用户消息
-    setMessages((prev) => [...prev, { id: nextMsgId(), role: 'user', content }])
 
     ws.send(
       JSON.stringify({
