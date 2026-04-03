@@ -2,8 +2,10 @@ import Fastify from 'fastify'
 import { setupWebSocket } from './gateway/ws'
 import { setupCalendarRoutes } from './gateway/calendar'
 import { setupPersonaRoutes } from './gateway/persona'
+import { setupEmotionRoutes } from './gateway/emotion'
 import { memoryService } from './memory/memory-service'
 import { greetingService } from './memory/greeting-service'
+import { emotionService } from './memory/emotion-service'
 import { initDataDir } from './paths'
 import {
   buildCorsOrigin,
@@ -76,6 +78,9 @@ export async function startBackend(options: {
   // 注册人格信息路由
   await setupPersonaRoutes(app)
 
+  // 注册情绪状态路由
+  await setupEmotionRoutes(app)
+
   await app.listen({ port, host: '127.0.0.1' })
   console.log(`[backend] Fastify listening on http://127.0.0.1:${port}`)
   console.log(`[backend] WebSocket ready on ws://127.0.0.1:${port}/ws`)
@@ -83,6 +88,7 @@ export async function startBackend(options: {
 
   // BOOT 行为：启动后异步执行（不阻塞服务就绪）
   // boot 完成后异步初始化互动语池（LLM 预生成）
+  emotionService.start()
   void memoryService.boot()
     .then(() => greetingService.init())
     .catch((err) => console.error('[backend] boot error:', err)
@@ -90,6 +96,7 @@ export async function startBackend(options: {
 
   return {
     close: async () => {
+      emotionService.stop()
       await app.close()
       console.log('[backend] server closed')
     },

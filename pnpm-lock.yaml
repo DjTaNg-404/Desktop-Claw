@@ -17,6 +17,9 @@ importers:
       '@desktop-claw/backend':
         specifier: workspace:*
         version: link:../../packages/backend
+      '@desktop-claw/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@fastify/websocket':
         specifier: ^11.2.0
         version: 11.2.0

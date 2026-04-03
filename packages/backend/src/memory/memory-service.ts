@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'fs'
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from 'fs'
 import { join } from 'path'
 import type { ChatMessageData } from '@desktop-claw/shared'
 import { streamChat } from '../llm/client'
@@ -204,6 +204,13 @@ export class MemoryService {
     if (!archive) return []
     // 返回不含 ts 的 ChatMessageData（兼容内存 conversation 格式）
     return archive.messages.map(({ ts: _ts, ...rest }) => rest)
+  }
+
+  /** 读取当日已落盘消息（含 ts，供 EmotionService 等需要时间戳的场景） */
+  getTodayPersistedMessages(): PersistedMessage[] {
+    const archive = readArchive(todayDateStr())
+    if (!archive) return []
+    return archive.messages
   }
 
   /** 返回最近 N 天的摘要（B.3 用） */
@@ -520,9 +527,20 @@ ${transcript}
 
     // 检测首次引导模式
     const bootstrapPath = join(resolvePersonaDir(), 'BOOTSTRAP.md')
-    result.isBootstrap = existsSync(bootstrapPath)
-    if (result.isBootstrap) {
-      console.log('[boot] BOOTSTRAP.md detected — first-run bootstrap mode')
+    if (existsSync(bootstrapPath)) {
+      // 代码级防御：如果 USER.md 已填充或有归档记录，说明引导早已完成，自动清理
+      const userPath = join(resolvePersonaDir(), 'USER.md')
+      const userContent = existsSync(userPath) ? readFileSync(userPath, 'utf-8') : ''
+      const memDir = resolveMemoryDir()
+      const hasArchives = readdirSync(memDir).some((f) => /^\d{4}-\d{2}-\d{2}\.json$/.test(f))
+      if (userContent.length > 150 || hasArchives) {
+        unlinkSync(bootstrapPath)
+        console.log('[boot] BOOTSTRAP.md auto-cleaned — user profile or archives already exist')
+        result.isBootstrap = false
+      } else {
+        result.isBootstrap = true
+        console.log('[boot] BOOTSTRAP.md detected — first-run bootstrap mode')
+      }
     }
 
     // 扫描所有未 sealed 的历史归档（跳过今天，今天还在进行中）

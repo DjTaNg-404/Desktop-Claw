@@ -128,14 +128,14 @@ export function assembleSystemPrompt(
 
   // Layer 3: USER.md（用户画像）
   const user = readCached(join(personaDir, 'USER.md'))
-  if (user && !user.startsWith('# 用户画像\n') || user.length > 150) {
+  if (user && (!user.startsWith('# 用户画像\n') || user.length > 150)) {
     // 非空模板才注入（排除只有标题和注释的初始模板）
     parts.push(user)
   }
 
   // Layer 4: CONTEXT.md（动态认知）
   const context = readCached(join(personaDir, 'CONTEXT.md'))
-  if (context && !context.startsWith('# 动态认知\n') || context.length > 150) {
+  if (context && (!context.startsWith('# 动态认知\n') || context.length > 150)) {
     // 非空模板才注入
     parts.push(context)
   }

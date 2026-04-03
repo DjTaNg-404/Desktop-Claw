@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, Menu, screen } from 'electron'
 import { randomBytes } from 'crypto'
-import { join } from 'path'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { join, basename, extname } from 'path'
+import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync } from 'fs'
 import { startBackend, copyInitialTemplates } from '@desktop-claw/backend'
 
 let ballWin: BrowserWindow | null = null
@@ -95,9 +95,34 @@ function createBallWindow(): void {
   // 透明区域点击穿透，forward: true 保留 mousemove 以触发 mouseenter/leave
   ballWin.setIgnoreMouseEvents(true, { forward: true })
 
+  // ── 定时器补偿：系统拖拽(drag-and-drop)期间 forward 不转发 drag 事件，
+  //    需要 polling 检测光标是否在球图标区域上方，临时关闭穿透以接收 drop ──
+  let pollIgnoring = true // 当前 main 认为的穿透状态
+  const POLL_INTERVAL = 80
+  const BALL_SIZE = 56
+  const pollTimer = setInterval(() => {
+    if (!ballWin || ballWin.isDestroyed()) return
+    const cursor = screen.getCursorScreenPoint()
+    const bounds = ballWin.getBounds()
+    // 球图标位于窗口底部居中
+    const ballCenterX = bounds.x + Math.round(bounds.width / 2)
+    const ballCenterY = bounds.y + bounds.height - 8 - Math.round(BALL_SIZE / 2)
+    const dx = cursor.x - ballCenterX
+    const dy = cursor.y - ballCenterY
+    const inBall = dx * dx + dy * dy <= (BALL_SIZE / 2 + 4) * (BALL_SIZE / 2 + 4)
+    if (inBall && pollIgnoring) {
+      pollIgnoring = false
+      ballWin.setIgnoreMouseEvents(false)
+    } else if (!inBall && !pollIgnoring) {
+      pollIgnoring = true
+      ballWin.setIgnoreMouseEvents(true, { forward: true })
+    }
+  }, POLL_INTERVAL)
+
   ballWin.on('ready-to-show', () => ballWin?.show())
 
   ballWin.on('closed', () => {
+    clearInterval(pollTimer)
     ballWin = null
   })
 
@@ -146,6 +171,55 @@ ipcMain.on('set-ignore-mouse-events', (_event, ignore: boolean) => {
 ipcMain.handle('ipc:ping', () => {
   console.log('[main] received ping from renderer')
   return 'pong from main 🐾'
+})
+
+// ── IPC: 文件拖拽入口 ─────────────────────────────────────
+
+interface FileAttachmentMain {
+  path: string
+  name: string
+  ext: string
+  size: number
+}
+
+ipcMain.handle('drop:files', (_event, paths: string[]): FileAttachmentMain[] => {
+  const results: FileAttachmentMain[] = []
+  for (const p of paths) {
+    try {
+      const stat = statSync(p)
+      if (stat.isFile()) {
+        results.push({
+          path: p,
+          name: basename(p),
+          ext: extname(p).toLowerCase(),
+          size: stat.size
+        })
+      }
+    } catch {
+      console.warn(`[main] drop:files — cannot stat: ${p}`)
+    }
+  }
+  return results
+})
+
+/** 待 ChatPanel 拉取的文件附件（拉模型避免 race condition） */
+let pendingFilesForPanel: FileAttachmentMain[] | null = null
+
+ipcMain.on('panel:open-with-files', (_event, files: FileAttachmentMain[]) => {
+  pendingFilesForPanel = files
+  createPanelWindow()
+  // 如果面板已存在（不是新建），直接 push 过去
+  if (panelWin && !panelWin.webContents.isLoading()) {
+    panelWin.webContents.send('receive-files', files)
+    pendingFilesForPanel = null
+  }
+  // 新窗口场景：ChatPanel 挂载后会主动调 getPendingFiles 拉取
+})
+
+ipcMain.handle('panel:get-pending-files', () => {
+  const files = pendingFilesForPanel
+  pendingFilesForPanel = null
+  return files
 })
 
 ipcMain.handle('backend:get-runtime-config', () => {

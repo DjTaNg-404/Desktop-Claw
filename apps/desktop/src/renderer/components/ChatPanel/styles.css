@@ -522,3 +522,73 @@
   flex-direction: column;
   gap: 12px;
 }
+
+/* ── 文件卡片（输入区上方）──────────────────────────── */
+
+.chat-panel__file-cards {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.file-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(50, 50, 56, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.file-card__icon {
+  font-size: 22px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.file-card__info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.file-card__name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #f0f0f0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-card__meta {
+  font-size: 11px;
+  color: rgba(240, 240, 240, 0.45);
+}
+
+.file-card__remove {
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(240, 240, 240, 0.5);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.file-card__remove:hover {
+  background: rgba(255, 80, 80, 0.3);
+  color: #ff6b6b;
+}

@@ -4,6 +4,7 @@ import type { WebSocket } from 'ws'
 import type { ChatMessageData } from '@desktop-claw/shared'
 import { TaskCoordinator } from '../task-coordinator'
 import { memoryService } from '../memory/memory-service'
+import { emotionService } from '../memory/emotion-service'
 import {
   getRequestToken,
   isAllowedOrigin,
@@ -112,8 +113,13 @@ function handleClientMessage(
       const content = (msg.payload?.content as string) ?? ''
 
       // 入队 Task Coordinator（串行执行）
+      let streamNotified = false
       const accepted = coordinator.enqueue(msg.taskId, content, {
         onToken(delta) {
+          if (!streamNotified) {
+            streamNotified = true
+            emotionService.notifyStreamStart()
+          }
           broadcast({
             id: genMsgId(),
             type: 'task.token',
@@ -132,6 +138,7 @@ function handleClientMessage(
           })
         },
         onDone(fullContent) {
+          emotionService.notifyTaskCompleted()
           broadcast({
             id: genMsgId(),
             type: 'task.done',
@@ -141,6 +148,7 @@ function handleClientMessage(
           })
         },
         onError(code, message) {
+          emotionService.notifyStreamEnd()
           broadcast({
             id: genMsgId(),
             type: 'task.error',
@@ -150,6 +158,7 @@ function handleClientMessage(
           })
         },
         onCancelled() {
+          emotionService.notifyStreamEnd()
           broadcast({
             id: genMsgId(),
             type: 'task.cancelled',
@@ -174,6 +183,7 @@ function handleClientMessage(
       // 只有任务真正被接受后，才将用户消息写入内存与磁盘。
       conversation.push({ role: 'user', content })
       memoryService.appendMessage({ role: 'user', content })
+      emotionService.notifyUserMessage()
 
       // 广播 ack（附带 content 以便其他窗口同步用户消息）
       broadcast({

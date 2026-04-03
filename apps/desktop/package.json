@@ -57,6 +57,7 @@
   },
   "dependencies": {
     "@desktop-claw/backend": "workspace:*",
+    "@desktop-claw/shared": "workspace:*",
     "@fastify/websocket": "^11.2.0",
     "fastify": "^5.8.2",
     "ws": "^8.19.0"
