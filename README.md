@@ -70,6 +70,8 @@ Desktop-Claw 想探索另一种方式：
 - **🐾  首次引导** — "互相认识"仪式，Claw 记住你的称呼和偏好 ✅
 - **🗓️  按天归档记忆** — 对话自动落盘，日历视图回顾历史 ✅
 - **💭  记忆检索** — Claw 能回忆过去的对话，跨天不失忆 ✅
+- **🧩  结构化记忆** — 自动提取人物画像、关系、话题，越聊越懂你 ✅
+- **🔄  记忆纠错** — 对话中让 Claw 更正或遗忘记忆 ✅
 - **⚡  Agent 状态提示** — 思考中、回忆中、读取文件中... 实时可见 ✅
 - **📝  轻记录与待办** — 随手就能发生（规划中）
 
@@ -82,8 +84,10 @@ Desktop-Claw 想探索另一种方式：
 - **实时流式响应** — 回答边生成边显示，不等待
 - **稳定人格** — 由 SOUL.md 定义角色性格，不漂移、不走样，重启后还是同一个 Claw
 - **按天记忆** — 每天的对话自动归档为 JSON，重启不失忆，用日历视图回顾历史
-- **每日内化** — 每天对话结束后 Claw 自主更新动态认知（CONTEXT.md），认识你越来越深
-- **记忆检索** — Claw 能按日期回忆、按关键词搜索过去的对话
+- **结构化记忆** — 6 类记忆对象（自我画像、关系、话题、来源、存档、原始对话），不是简单 RAG
+- **后台记忆提取** — 对话过程中异步提取关键信息，静默积累长期记忆
+- **每日归档内化** — 关机或日终时自动总结、写日记、提取事实，编译为人格文件
+- **记忆纠错与遗忘** — 对话中告诉 Claw "你记错了"或"忘掉这个"，即时更正
 - **首次引导** — 第一次见面有"互相认识"仪式，你可以塑造 Claw 的性格倾向
 - **文件操作** — 读取桌面/文档/下载目录的文件，支持 .pdf / .docx / .xlsx 文本提取
 - **Agent 技能体系** — 三级渐进式披露，按需激活能力，不浪费 token
@@ -114,11 +118,16 @@ Task Coordinator (FIFO 任务队列)
 Skill  Skill
         │
         ▼
-Prompt Assembler (5 层 System Prompt 组装)
-  │  SOUL.md · USER.md · CONTEXT.md
+Prompt Assembler (6 层 System Prompt 组装)
+  │  Base · SOUL.md · USER.md · CONTEXT.md · Skills · BOOTSTRAP.md
   │
   ▼
-Memory Service (按天 JSON 归档 + 每日内化)
+Memory System
+  ├─ Memory Service (按天 JSON 归档 + 日终封存)
+  ├─ Interpret Service (后台记忆提取)
+  ├─ Maintain Service (日终维护与事实清洗)
+  ├─ Capsule Compiler (编译 USER.md / CONTEXT.md)
+  └─ Index Service (5 类索引：self / relationship / topic / saved / source)
 ```
 
 **技术栈：** Electron · React · TypeScript · Node.js · Fastify · OpenAI 兼容 API
@@ -191,6 +200,7 @@ pnpm run package:win
 | 基础架构 | 架构设计与技术选型 | ✅ 完成 |
 | 核心闭环 | 桌面入口 + Agent Loop + 基础工具 | ✅ 完成 |
 | 体验稳定 | 人格体系 + 记忆归档 + 断线重连 + 日历视图 | ✅ 完成 |
+| 记忆系统 | 结构化记忆 + 后台提取 + 日终内化 + 记忆纠错 | ✅ 完成 |
 | 发布就绪 | 打包分发 + 数据路径适配 + 跨平台 | ✅ 完成 |
 
 ---
