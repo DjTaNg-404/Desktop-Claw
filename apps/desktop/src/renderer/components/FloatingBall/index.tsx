@@ -1,5 +1,8 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react'
 import type { EmotionState } from '@desktop-claw/shared'
+import achengImg from './acheng.png'
+import busyImg from './busy.png'
+import nightImg from './night.png'
 import { ChatBubble } from '../ChatBubble'
 import { QuickInput } from '../QuickInput'
 import { useClawSocket } from '../../hooks/useClawSocket'
@@ -483,7 +486,12 @@ export function FloatingBall(): React.JSX.Element {
           onContextMenu={handleContextMenu}
           title="Claw 🐾"
         >
-          <span className="ball__icon">🐾</span>
+          <img
+            className="ball__icon"
+            src={emotion === 'night' ? nightImg : (emotion === 'busy' || emotion === 'done') ? busyImg : achengImg}
+            alt="Claw"
+            draggable={false}
+          />
         </div>
         {expanded && direction === 'right' && (
           <div className="qi-area">

@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 // 渲染进程全局类型声明（由 preload/index.ts 通过 contextBridge 注入）
 export {}
 

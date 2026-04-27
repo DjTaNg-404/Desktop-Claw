@@ -30,6 +30,13 @@ QUERY-ENGINE-STUDY.md
 Desktop-Claw_Topic_Context_Wiki_Design_CN.md
 Desktop-Claw_Memory_System_Design_CN.md
 PLAN-Memory-System.md
+docs/*.md
+技术文档
+
+# ---- 桌宠素材源文件（本地设计资产）----
+/acheng.png
+/busy.png
+/night.png
 
 # ---- 参考代码（第三方，仅供本地参考）----
 reference/

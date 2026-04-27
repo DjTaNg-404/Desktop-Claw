@@ -86,42 +86,37 @@ body,
 
 /* ── 悬浮球 ──────────────────────────────── */
 .ball {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: linear-gradient(145deg, #ff9441, #e8550a);
+  width: 72px;
+  height: 72px;
+  border-radius: 0;
+  background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   user-select: none;
   flex-shrink: 0;
-  box-shadow:
-    0 4px 14px rgba(232, 85, 10, 0.55),
-    0 1px 4px rgba(0, 0, 0, 0.35);
-  transition:
-    transform 0.12s ease,
-    box-shadow 0.12s ease;
+  box-shadow: none;
+  transition: transform 0.12s ease;
+  overflow: visible;
 }
 
 .ball:hover {
   transform: scale(1.1);
-  box-shadow:
-    0 6px 22px rgba(232, 85, 10, 0.7),
-    0 2px 6px rgba(0, 0, 0, 0.35);
+  box-shadow: none;
 }
 
 .ball:active {
   transform: scale(0.92);
-  box-shadow:
-    0 2px 8px rgba(232, 85, 10, 0.4),
-    0 1px 2px rgba(0, 0, 0, 0.3);
+  box-shadow: none;
 }
 
 .ball__icon {
-  font-size: 26px;
-  line-height: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
   pointer-events: none;
+  border-radius: 0;
 }
 
 /* ── 文件拖入高亮 ────────────────────────── */
@@ -129,8 +124,7 @@ body,
   transform: scale(1.2);
   box-shadow:
     0 0 24px rgba(100, 180, 255, 0.8),
-    0 0 48px rgba(100, 180, 255, 0.4),
-    0 4px 14px rgba(232, 85, 10, 0.55);
+    0 0 48px rgba(100, 180, 255, 0.4);
   animation: drop-pulse 1s ease-in-out infinite;
 }
 
@@ -140,288 +134,59 @@ body,
 }
 
 /* ══════════════════════════════════════════════
-   情绪层样式映射 — 通过 data-emotion 属性驱动
+   情绪层 v3 — 纯小动作动画，无光晕无背景
    状态：idle / busy / done / night
-   v2: 拉开状态差异 + 外圈 halo 独立信号
+   动画作用在 .ball__icon 上，让人脸自身有动作
    ══════════════════════════════════════════════ */
 
-/* ── 共用基础 ────────────────────────────── */
-.ball[data-emotion] {
-  position: relative;
-  animation-fill-mode: both;
-  transition:
-    background 0.8s ease,
-    box-shadow 0.8s ease,
-    transform 0.12s ease;
+/* idle —— 极慢上下浮动，像悬空轻飘 */
+.ball[data-emotion="idle"] .ball__icon {
+  animation: float-idle 6s ease-in-out infinite;
 }
 
-/* 外圈 halo — 独立于球体的光晕层 */
-.ball[data-emotion]::after {
-  content: '';
-  position: absolute;
-  inset: -6px;
-  border-radius: 50%;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.8s ease;
+@keyframes float-idle {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-4px); }
 }
 
-/* ──────────────────────────────────────────
-   idle：日常待机，极稳，几乎不动
-   呼吸 5s，scale 仅 1.008，glow 微弱
-   halo 不亮 — 纯静态存在感
-   ────────────────────────────────────────── */
-.ball[data-emotion="idle"] {
-  background: linear-gradient(145deg, #ff9441, #e8550a);
-  box-shadow:
-    0 3px 10px rgba(232, 85, 10, 0.35),
-    0 1px 3px rgba(0, 0, 0, 0.25);
-  animation: breath-idle 5s ease-in-out infinite;
+/* busy —— 轻微左右摇头，像专注思考时的小动作 */
+.ball[data-emotion="busy"] .ball__icon {
+  animation: shake-busy 1.5s ease-in-out infinite;
+  transform-origin: 50% 70%;
 }
 
-.ball[data-emotion="idle"]::after {
-  opacity: 0; /* idle 无 halo */
+@keyframes shake-busy {
+  0%, 100% { transform: rotate(-3deg); }
+  50%      { transform: rotate(3deg); }
 }
 
-@keyframes breath-idle {
-  0%, 100% {
-    box-shadow:
-      0 3px 10px rgba(232, 85, 10, 0.35),
-      0 1px 3px rgba(0, 0, 0, 0.25);
-    transform: scale(1);
-  }
-  50% {
-    box-shadow:
-      0 4px 12px rgba(232, 85, 10, 0.42),
-      0 1px 4px rgba(0, 0, 0, 0.25);
-    transform: scale(1.008);
-  }
+/* done —— 满足的小幅左右晃动，比 busy 慢、幅度小 */
+.ball[data-emotion="done"] .ball__icon {
+  animation: sway-done 4s ease-in-out infinite;
+  transform-origin: 50% 70%;
 }
 
-/* ──────────────────────────────────────────
-   busy：活跃投入，明显呼吸 + 外圈脉冲
-   呼吸 2.2s，scale 1→1.06，halo 有节奏
-   ────────────────────────────────────────── */
-.ball[data-emotion="busy"] {
-  background: linear-gradient(145deg, #ffaa55, #f06818);
-  box-shadow:
-    0 5px 20px rgba(240, 104, 24, 0.6),
-    0 0 8px rgba(255, 160, 60, 0.3),
-    0 2px 5px rgba(0, 0, 0, 0.3);
-  animation: breath-busy 2.2s ease-in-out infinite;
+@keyframes sway-done {
+  0%, 100% { transform: rotate(0deg) translateY(0); }
+  25%      { transform: rotate(-2deg) translateY(-1px); }
+  75%      { transform: rotate(2deg) translateY(-1px); }
 }
 
-.ball[data-emotion="busy"]::after {
-  opacity: 1;
-  box-shadow:
-    0 0 18px 4px rgba(255, 140, 40, 0.25);
-  animation: halo-busy 2.2s ease-in-out infinite;
+/* night —— 极慢点头打盹 + 整体亮度降低 */
+.ball[data-emotion="night"] .ball__icon {
+  animation: nod-night 8s ease-in-out infinite;
+  transform-origin: 50% 30%;
+  filter: brightness(0.85) saturate(0.85);
 }
 
-@keyframes breath-busy {
-  0%, 100% {
-    box-shadow:
-      0 5px 20px rgba(240, 104, 24, 0.6),
-      0 0 8px rgba(255, 160, 60, 0.3),
-      0 2px 5px rgba(0, 0, 0, 0.3);
-    transform: scale(1);
-  }
-  50% {
-    box-shadow:
-      0 8px 32px rgba(240, 104, 24, 0.85),
-      0 0 16px rgba(255, 160, 60, 0.5),
-      0 3px 8px rgba(0, 0, 0, 0.3);
-    transform: scale(1.06);
-  }
+@keyframes nod-night {
+  0%, 100% { transform: rotate(0deg); }
+  50%      { transform: rotate(6deg); }
 }
 
-@keyframes halo-busy {
-  0%, 100% {
-    box-shadow: 0 0 18px 4px rgba(255, 140, 40, 0.2);
-  }
-  50% {
-    box-shadow: 0 0 30px 8px rgba(255, 140, 40, 0.4);
-  }
-}
-
-/* ──────────────────────────────────────────
-   done：收工松弛，"伸懒腰"节奏
-   呼吸 6s，非对称曲线（快起慢回），scale 1→1.03
-   halo 柔和常亮 — 温暖但不活跃
-   ────────────────────────────────────────── */
-.ball[data-emotion="done"] {
-  background: linear-gradient(145deg, #f0924a, #d86020);
-  box-shadow:
-    0 4px 14px rgba(216, 96, 32, 0.45),
-    0 0 6px rgba(240, 146, 74, 0.2),
-    0 1px 4px rgba(0, 0, 0, 0.25);
-  animation: breath-done 6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-}
-
-.ball[data-emotion="done"]::after {
-  opacity: 1;
-  box-shadow:
-    0 0 14px 3px rgba(240, 146, 74, 0.15);
-  animation: halo-done 6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-}
-
-@keyframes breath-done {
-  0%, 100% {
-    box-shadow:
-      0 4px 14px rgba(216, 96, 32, 0.45),
-      0 0 6px rgba(240, 146, 74, 0.2),
-      0 1px 4px rgba(0, 0, 0, 0.25);
-    transform: scale(1);
-  }
-  /* 快速起 */
-  35% {
-    box-shadow:
-      0 5px 20px rgba(216, 96, 32, 0.55),
-      0 0 10px rgba(240, 146, 74, 0.3),
-      0 2px 5px rgba(0, 0, 0, 0.25);
-    transform: scale(1.03);
-  }
-  /* 缓慢回 */
-  70% {
-    box-shadow:
-      0 4px 16px rgba(216, 96, 32, 0.48),
-      0 0 7px rgba(240, 146, 74, 0.22),
-      0 1px 4px rgba(0, 0, 0, 0.25);
-    transform: scale(1.01);
-  }
-}
-
-@keyframes halo-done {
-  0%, 100% {
-    box-shadow: 0 0 14px 3px rgba(240, 146, 74, 0.12);
-  }
-  35% {
-    box-shadow: 0 0 20px 5px rgba(240, 146, 74, 0.22);
-  }
-  70% {
-    box-shadow: 0 0 16px 3px rgba(240, 146, 74, 0.14);
-  }
-}
-
-/* ──────────────────────────────────────────
-   night：深沉休眠，暗色调，几乎不动
-   呼吸 8s，scale 仅 1.005，halo 极暗暖光
-   渐变明显偏深 — 和白天一眼有别
-   ────────────────────────────────────────── */
-.ball[data-emotion="night"] {
-  background: linear-gradient(145deg, #d07030, #a84010);
-  box-shadow:
-    0 2px 8px rgba(168, 64, 16, 0.3),
-    0 1px 2px rgba(0, 0, 0, 0.3);
-  animation: breath-night 8s ease-in-out infinite;
-}
-
-.ball[data-emotion="night"]::after {
-  opacity: 1;
-  box-shadow:
-    0 0 10px 2px rgba(200, 100, 40, 0.08);
-  animation: halo-night 8s ease-in-out infinite;
-}
-
-@keyframes breath-night {
-  0%, 100% {
-    box-shadow:
-      0 2px 8px rgba(168, 64, 16, 0.3),
-      0 1px 2px rgba(0, 0, 0, 0.3);
-    transform: scale(1);
-  }
-  50% {
-    box-shadow:
-      0 3px 10px rgba(168, 64, 16, 0.35),
-      0 1px 3px rgba(0, 0, 0, 0.3);
-    transform: scale(1.005);
-  }
-}
-
-@keyframes halo-night {
-  0%, 100% {
-    box-shadow: 0 0 10px 2px rgba(200, 100, 40, 0.06);
-  }
-  50% {
-    box-shadow: 0 0 12px 3px rgba(200, 100, 40, 0.1);
-  }
-}
-
-/* ── hover：按状态轻提亮，暂停呼吸 ────────── */
-.ball[data-emotion]:hover {
-  animation-play-state: paused;
-}
-.ball[data-emotion]:hover::after {
+/* hover：暂停动画，icon 略放大（容器已有 scale，这里只暂停） */
+.ball[data-emotion]:hover .ball__icon,
+.ball[data-emotion]:active .ball__icon {
   animation-play-state: paused;
 }
 
-.ball[data-emotion="idle"]:hover {
-  box-shadow:
-    0 4px 14px rgba(232, 85, 10, 0.5),
-    0 1px 4px rgba(0, 0, 0, 0.28);
-  transform: scale(1.04);
-}
-
-.ball[data-emotion="busy"]:hover {
-  box-shadow:
-    0 7px 28px rgba(240, 104, 24, 0.8),
-    0 0 14px rgba(255, 160, 60, 0.45),
-    0 2px 6px rgba(0, 0, 0, 0.3);
-  transform: scale(1.08);
-}
-
-.ball[data-emotion="done"]:hover {
-  box-shadow:
-    0 5px 18px rgba(216, 96, 32, 0.55),
-    0 0 8px rgba(240, 146, 74, 0.25),
-    0 2px 5px rgba(0, 0, 0, 0.25);
-  transform: scale(1.05);
-}
-
-.ball[data-emotion="night"]:hover {
-  box-shadow:
-    0 3px 10px rgba(168, 64, 16, 0.38),
-    0 1px 3px rgba(0, 0, 0, 0.3);
-  transform: scale(1.02);
-}
-
-.ball[data-emotion]:active {
-  animation-play-state: paused;
-}
-.ball[data-emotion]:active::after {
-  animation-play-state: paused;
-}
-
-/* ── drag end 恢复：busy 快、night 慢 ────── */
-.ball[data-emotion="idle"] {
-  transition:
-    background 0.8s ease,
-    box-shadow 0.3s ease,
-    transform 0.3s ease;
-}
-
-.ball[data-emotion="busy"] {
-  transition:
-    background 0.8s ease,
-    box-shadow 0.15s ease,
-    transform 0.15s ease;
-}
-
-.ball[data-emotion="done"] {
-  transition:
-    background 0.8s ease,
-    box-shadow 0.4s ease,
-    transform 0.4s ease;
-}
-
-.ball[data-emotion="night"] {
-  transition:
-    background 0.8s ease,
-    box-shadow 0.6s ease,
-    transform 0.6s ease;
-}
-
-/* ── drop-active 高于情绪层 ─────────────── */
-.ball--drop-active[data-emotion] {
-  animation: drop-pulse 1s ease-in-out infinite;
-}
